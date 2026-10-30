@@ -79,3 +79,25 @@ instead of guessing.
 Reason: measured fact. `tickets.py` knows only todo, in_progress and done. A Blocked Ticket stays not-done, so its
 dependents never become READY; the Factory records the reason in git-ignored `.factory/blocked/<num>.md` and commits the
 half-done work on the Ticket's branch, which it does not push.
+
+## 2026-10-30 The goal names the exact status command and checks
+
+Reason: measured fact. In live runs `/goal` only worked reliably when its wording named the exact `status` command and
+the exact `checks` commands, so the Factory now writes them into the goal text.
+
+## 2026-10-30 Sessions start with `--strict-mcp-config`
+
+Reason: measured fact. Without it, the owner's own MCP servers (some slow or failing to connect) loaded into every
+unattended Session. Sessions now see only the MCP servers the Factory passes, which is none.
+
+## 2026-10-30 The Factory's checks outrank a Session's BLOCKED claim
+
+Reason: best practice, trust the objective check over the model's claim. If the Ticket is done and every `checks`
+command exits 0, a BLOCKED claim does not block the Ticket. It is recorded as a `[high]` loose end, so the Owner still
+reads it and the Run stops after that pull request.
+
+## 2026-10-30 Review Sessions may run the configured checks
+
+Reason: measured fact. In live run 4 the reviewer could not run `make test` (permission refused) and judged from the
+diff alone. Review Sessions now get `Bash(<check>*)` for each configured check. They stay unable to edit files or
+commit.

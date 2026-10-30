@@ -92,7 +92,9 @@ class Factory:
 
     def review_tools(self) -> tuple[str, ...]:
         tk = self.tracker.command
-        return ("Skill", "Agent", "Read", "Glob", "Grep", *GIT_READ, f"Bash({tk} show*)", f"Bash({tk} status*)")
+        checks = tuple(f"Bash({c}*)" for c in self.cfg.checks)  # reviewer verifies by running them, not by reading
+        own = ("Skill", "Agent", "Read", "Glob", "Grep", *GIT_READ)
+        return (*own, f"Bash({tk} show*)", f"Bash({tk} status*)", *checks)
 
     def command(self, prompt: str, *, review: bool) -> list[str]:
         return session_command(

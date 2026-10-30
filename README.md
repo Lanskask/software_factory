@@ -33,10 +33,13 @@ If the Project already has Tickets in the `/to-tickets` format, skip `plan`.
 2. Implementation Session: `/goal` with the `implement`, `tdd` and `diagnosing-bugs` skills. It commits, ticks the
    tasks, marks the Ticket done with a Brief, and writes a Handoff to `.factory/handoffs/<num>.md`.
 3. The Factory checks for itself: Ticket done, clean tree, new commits, Handoff written, every `checks` command exits 0.
-4. Review Session, fresh and read-only: `code-review` (plus `security-and-hardening` where it applies), ending in
-   `VERDICT: PASS|FAIL`. A FAIL gets one fix Session and another review.
+4. Review Session, fresh, cannot edit files, may run the `checks`: `code-review` (plus `security-and-hardening` where it
+   applies), ending in `VERDICT: PASS|FAIL`. A FAIL gets one fix Session and another review.
 5. The Factory runs `git push` and `gh pr create --draft`, with the previous Ticket's branch as the base.
 6. The Handoff is appended to `.factory/LOOSE-ENDS.md`. A `[high]` item stops the Run so you read it first.
+
+A Session's BLOCKED claim does not override the checks: if the Ticket is done and every check passes, the claim becomes
+a `[high]` loose end instead. Sessions load no MCP servers (`--strict-mcp-config`).
 
 A Ticket that fails any step becomes Blocked: the reason goes to `.factory/blocked/<num>.md`, its work stays committed
 on its unpushed branch, and Tickets that depend on it are not run. Two Blocked Tickets stop the Run. Delete the file to

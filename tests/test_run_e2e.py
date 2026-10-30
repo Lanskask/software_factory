@@ -223,3 +223,8 @@ def test_dry_run_spends_nothing(project: Path, capsys: pytest.CaptureFixture[str
     with_tickets(project, {"01": {"slug": "a"}})
     assert factory(project).run(dry_run=True) == 0
     assert claude_calls(project) == [] and "/goal" in capsys.readouterr().out
+
+
+def test_review_session_may_run_the_configured_checks(project: Path) -> None:
+    f = factory(project)
+    assert "Bash(test -f t/tickets.json*)" in f.review_tools()
