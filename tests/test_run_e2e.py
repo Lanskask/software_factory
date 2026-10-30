@@ -63,9 +63,12 @@ else:
     with open(handoff, "w") as f:
         f.write("## Out of scope\n" + ("- [high] auth bypass\n" if num in loose.split(",") else "- [low] typo\n"))
     open(f"feature-{num}.txt", "w").write("x\n")
-    tk = re.search(r"`(\S+ -I \S+ --dir \S+)`", prompt).group(1).split()
+    tk = re.search(r"`(\S+ -I \S+ --dir \S+) status`", prompt).group(1).split()
     subprocess.run([*tk, "mark", num, "done", "--brief", "did it"], check=True)
 subprocess.run(["git", "add", "-A"], check=True)
+if num in os.environ.get("FAKE_BLOCKED_DONE", "").split(","):
+    subprocess.run(["git", "commit", "-qm", f"ticket {num}"], check=True)
+    result("all done, but\nBLOCKED: wants the owner to allow uvx ty")
 subprocess.run(["git", "commit", "-qm", f"ticket {num}"], check=True)
 result("DONE")
 """
@@ -188,6 +191,18 @@ def test_high_loose_end_stops_the_run_after_its_pr(project: Path, monkeypatch: p
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
     assert factory(project).run() == 1
     assert len(gh_calls(project)) == 1
+
+
+def test_blocked_claim_on_a_verified_ticket_becomes_a_high_loose_end(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_BLOCKED_DONE", "01")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 1  # stops for the Owner after the pull request
+    assert len(gh_calls(project)) == 1
+    assert "[high]" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
+    assert "uvx ty" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
+    assert not (project / ".factory" / "blocked").exists()
 
 
 def test_ticket_mentioning_cloud_tools_is_skipped(project: Path) -> None:

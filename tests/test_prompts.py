@@ -18,14 +18,21 @@ T = Ticket("10/13", "todo", True, "web-build")
 
 
 def test_goal_is_a_slash_goal_with_the_done_condition() -> None:
-    g = goal(T, "python3 -I t/tickets.py --dir t", Path("/p/.factory/handoffs/10-13.md"), None)
+    g = goal(T, "python3 -I t/tickets.py --dir t", Path("/p/.factory/handoffs/10-13.md"), None, CFG.checks)
     assert g.startswith("/goal ")
-    assert "10/13" in g and "make" not in g  # checks live in the rules, the goal only names them
     assert "/p/.factory/handoffs/10-13.md" in g and "BLOCKED:" in g
 
 
+def test_goal_names_the_exact_status_command_and_checks() -> None:
+    # Live run 2026-10-30: the /goal judge ran the bare tickets command (an error) and counted the owner's global
+    # rules (`uvx ty`) as "checks in your instructions", so a finished Ticket never met its goal.
+    g = goal(T, "python3 -I t/tickets.py --dir t", Path("/h/now.md"), None, CFG.checks)
+    assert "`python3 -I t/tickets.py --dir t status`" in g
+    assert "`make test`, `make lint`" in g and "instructions" not in g
+
+
 def test_goal_points_at_the_previous_handoff_when_there_is_one() -> None:
-    g = goal(T, "tk", Path("/h/now.md"), Path("/h/prev.md"))
+    g = goal(T, "tk", Path("/h/now.md"), Path("/h/prev.md"), CFG.checks)
     assert "/h/prev.md" in g
 
 

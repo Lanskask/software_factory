@@ -69,21 +69,26 @@ Never
 """
 
 
-def goal(ticket: Ticket, tk: str, handoff: Path, previous: Path | None) -> str:
+def _checks(checks: tuple[str, ...]) -> str:
+    return ", ".join(f"`{c}`" for c in checks)
+
+
+# The /goal judge reads the condition literally: name exact commands, never "the checks in your instructions".
+def goal(ticket: Ticket, tk: str, handoff: Path, previous: Path | None, checks: tuple[str, ...]) -> str:
     before = f" Read {previous} first: the previous Ticket's Handoff, for context only." if previous else ""
     return (
-        f"/goal Ticket {ticket.num} ({ticket.slug}) is done: the Tickets command `{tk}` shows it done, every check in "
-        f"your instructions exits 0 with its output shown, `git status` is clean, and you wrote the Handoff to "
-        f"{handoff} . Or your last message ends with a line BLOCKED: <reason>, because it needs the Owner.{before}"
+        f"/goal Ticket {ticket.num} ({ticket.slug}) is done: `{tk} status` shows it done, {_checks(checks)} each "
+        f"exit 0 with output shown, `git status` is clean, and you wrote the Handoff to {handoff} . Or your last "
+        f"message ends with a line BLOCKED: <reason>, because it needs the Owner.{before}"
     )
 
 
-def fix_goal(ticket: Ticket, tk: str, handoff: Path, findings: str) -> str:
+def fix_goal(ticket: Ticket, tk: str, handoff: Path, findings: str, checks: tuple[str, ...]) -> str:
     return (
         f"/goal Ticket {ticket.num} ({ticket.slug}): every review finding below is fixed, with a test where one "
-        f"applies; every check in your instructions exits 0 with its output shown; `git status` is clean; the Handoff "
-        f"{handoff} is up to date; the Tickets command is `{tk}`. Or your last message ends with a line "
-        f"BLOCKED: <reason>.\n\nReview findings:\n{findings}"
+        f"applies; {_checks(checks)} each exit 0 with output shown; `git status` is clean; the Handoff {handoff} is "
+        f"up to date (Tickets: `{tk} status`). Or your last message ends with a line BLOCKED: <reason>.\n\n"
+        f"Review findings:\n{findings}"
     )
 
 

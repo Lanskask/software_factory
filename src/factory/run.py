@@ -158,7 +158,13 @@ class Factory:
             if dry_run:
                 self.plugin_dir = str(self.state / "plugin") if self.skills() else None
                 print(f"next: {ticket.num} on {ticket.branch(self.cfg.branch_prefix)} from {base}")
-                print(shlex.join(self.command(goal(ticket, self.tracker.command, handoff, previous), review=False)))
+                print(
+                    shlex.join(
+                        self.command(
+                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks), review=False
+                        )
+                    )
+                )
                 return 0
             self.ensure_plugin()
             try:
@@ -196,7 +202,7 @@ class Factory:
             return self.block(t, base, f"branch {branch} already exists from an earlier Run: delete or rename it")
         self.git("switch", "-q", "-c", branch, base)
         tk = self.tracker.command
-        res = self.session(t, "implement", goal(t, tk, handoff, previous))
+        res = self.session(t, "implement", goal(t, tk, handoff, previous, self.cfg.checks))
         problem = self.verify(t, base, res, handoff)
         if problem:
             return self.block(t, base, problem)
@@ -211,7 +217,7 @@ class Factory:
                 break
             if round_ == self.cfg.review_rounds:
                 return self.block(t, base, f"review still FAIL after {round_} rounds:\n{findings}")
-            fx = self.session(t, "fix", fix_goal(t, tk, handoff, findings))
+            fx = self.session(t, "fix", fix_goal(t, tk, handoff, findings, self.cfg.checks))
             problem = self.verify(t, base, fx, handoff)
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
@@ -222,12 +228,18 @@ class Factory:
         return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(loose))
 
     def verify(self, t: Ticket, base: str, res: SessionResult, handoff: Path) -> str | None:
-        """Why the Ticket is not done, checked by the Factory itself; None when it is."""
+        """Why the Ticket is not done; None when it is. The Factory's own checks outrank what the Session says."""
         reason = blocked_reason(res.text)
+        problem = self.objective_problem(t, base, handoff)
+        if problem:
+            return reason or (f"session failed: {res.text}" if not res.ok else problem)
         if reason:
-            return reason
-        if not res.ok:
-            return f"session failed: {res.text}"
+            # Done and verified, yet the Session asked for the Owner: the Owner reads it before more is stacked.
+            with handoff.open("a") as f:
+                f.write(f"\n- [high] The Session ended with BLOCKED although the Ticket checks pass: {reason}\n")
+        return None
+
+    def objective_problem(self, t: Ticket, base: str, handoff: Path) -> str | None:
         if not self.tracker.is_done(t.num):
             return "the Ticket is not marked done"
         if self.git("status", "--porcelain"):
