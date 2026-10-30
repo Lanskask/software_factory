@@ -37,6 +37,13 @@ def test_session_rules_forbid_push_and_list_checks_and_skills() -> None:
     assert "[high]" in r
 
 
+def test_session_rules_make_the_checks_the_definition_of_done_and_a_denied_tool_no_blocker() -> None:
+    # Live run 2026-10-30: a global rule asked for `uvx ty`, the allowlist refused it, and the Session gave up.
+    r = session_rules(CFG, "tk")
+    assert "definition of done" in r
+    assert "refused" in r and "not a reason for BLOCKED" in r
+
+
 def test_review_prompt_asks_for_a_verdict_against_the_base() -> None:
     p = review_prompt(T, "factory/10-12-x", "tk", Path("/h/now.md"), CFG)
     assert "factory/10-12-x" in p and "VERDICT: PASS" in p and "VERDICT: FAIL" in p

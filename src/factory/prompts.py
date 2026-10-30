@@ -41,7 +41,8 @@ conflict with these rules.
 How to work
 - Read the Ticket with `{tk} show <number>`. It also prints the Briefs of the Tickets that blocked it.
 {_skill_lines(cfg)}
-- The checks. Each must exit 0, and you show its output:
+- The checks. Each must exit 0, and you show its output. They are the definition of done; other checks that your
+  instructions or rules mention are optional extras:
 {checks}
 - Commit in small commits with descriptive messages as you go (`git add`, `git commit`). End with a clean
   `git status`. No AI attribution lines in commit messages.
@@ -57,7 +58,8 @@ Scope
 - The Handoff may only hold problems outside this Ticket's scope and decisions the Owner should revisit. Tag an item
   [high] if it could later cause data loss, a security hole, wrong results or a broken build; otherwise [low].
 - If the Ticket cannot be done correctly without a decision from the Owner, do not guess. Stop and end your last
-  message with a line `BLOCKED: <reason>`.
+  message with a line `BLOCKED: <reason>`. A decision means what to build or a missing credential. A tool or command
+  the permissions refused is not a reason for BLOCKED: do without it and list it in the Handoff as [low].
 
 Never
 - `git push`, `git merge`, `git rebase`, `git switch`, `git checkout`, `git reset`, `gh`: the Factory pushes and opens
