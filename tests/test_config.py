@@ -13,9 +13,9 @@ def write(project: Path, text: str) -> None:
 
 
 def test_load_config_reads_required_keys_and_keeps_defaults(tmp_path: Path) -> None:
-    write(tmp_path, 'tickets_dir = ".scratch/app/issues"\nchecks = ["make test", "make lint"]\n')
+    write(tmp_path, 'tickets_dir = ".scratch/app/tickets"\nchecks = ["make test", "make lint"]\n')
     cfg = load_config(tmp_path)
-    assert cfg.tickets_dir == ".scratch/app/issues"
+    assert cfg.tickets_dir == ".scratch/app/tickets"
     assert cfg.checks == ("make test", "make lint")
     assert (cfg.max_tickets, cfg.max_blocked, cfg.budget_usd, cfg.timeout_minutes) == (10, 2, 5.0, 90)
     assert cfg.base_branch == "main"
@@ -49,7 +49,7 @@ def test_template_uses_makefile_targets_that_exist(tmp_path: Path) -> None:
     write(tmp_path, template(tmp_path))
     cfg = load_config(tmp_path)
     assert cfg.checks == ("make test", "make lint")
-    assert cfg.tickets_dir == f".scratch/{tmp_path.name}/issues"
+    assert cfg.tickets_dir == f".scratch/{tmp_path.name}/tickets"
 
 
 def test_config_defaults_are_a_valid_config() -> None:

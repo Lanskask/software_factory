@@ -43,10 +43,10 @@ def test_chain_without_spec_grills_first_and_with_spec_reviews_it() -> None:
 
 
 def test_planning_rules_name_the_steps_the_tickets_dir_and_the_spec() -> None:
-    cfg = Config(tickets_dir=".scratch/app/issues", checks=("make test",))
+    cfg = Config(tickets_dir=".scratch/app/tickets", checks=("make test",))
     r = planning_rules(cfg, Path("docs/spec.md"), chain(spec=True))
     assert "1. factory:egm-review-loop" in r and "2. factory:to-tickets" in r
-    assert ".scratch/app/issues" in r and "docs/spec.md" in r
+    assert ".scratch/app/tickets" in r and "docs/spec.md" in r
     assert "go-ahead" in r
 
 

@@ -94,7 +94,7 @@ def template(project: Path) -> str:
     checks = [f"make {t}" for t in ("test", "lint", "e2e") if t in targets] or ["make test"]
     quoted = ", ".join(f'"{c}"' for c in checks)
     return f'''# Software Factory settings for this Project. Every key but the first two is optional.
-tickets_dir = ".scratch/{project.name}/issues"  # where /to-tickets writes tickets.py and NN-*.md
+tickets_dir = ".scratch/{project.name}/tickets"  # where /to-tickets writes tickets.py and NN-*.md
 checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 
 # base_branch = "main"
