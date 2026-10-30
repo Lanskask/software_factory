@@ -39,7 +39,8 @@ def session_command(
     if model:
         cmd += ["--model", model]
     cmd += ["--max-budget-usd", str(budget_usd), "--output-format", "stream-json", "--verbose"]
-    return [*cmd, "--no-session-persistence"]
+    # No MCP servers in unattended sessions: they write into the Project (.serena/) or reach outside (mail, chat).
+    return [*cmd, "--strict-mcp-config", "--no-session-persistence"]
 
 
 def parse_stream(text: str) -> SessionResult:

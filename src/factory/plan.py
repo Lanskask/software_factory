@@ -11,6 +11,7 @@ from pathlib import Path
 
 from factory.claude import run_session, session_command
 from factory.config import Config
+from factory.run import GIT_READ
 from factory.skills import INSTALLED, build_plugin, local_name
 from factory.tracker import Tracker
 
@@ -23,13 +24,10 @@ BOOTSTRAP_TOOLS = (
     "Write",
     "Edit",
     "TodoWrite",
+    *GIT_READ,
     "Bash(git ls-files*)",
-    "Bash(git log*)",
-    "Bash(git status*)",
-    "Bash(ls*)",
-    "Bash(find*)",
-    "Bash(wc*)",
     "Bash(mkdir*)",
+    "Bash(npx --yes prettier@3.3.3*)",  # egm-bootstrap formats its EGM_DOC.md files with the owner's md-style
 )
 
 

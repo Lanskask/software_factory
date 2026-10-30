@@ -23,7 +23,9 @@ from factory.prompts import (
 from factory.skills import INSTALLED, build_plugin
 from factory.tracker import Ticket, Tracker
 
-GIT_READ = ("Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)")
+# Read-only shell commands, so compound commands like `ls; cat x` are not refused (measured in the bootstrap log).
+SHELL_READ = tuple(f"Bash({c}*)" for c in ("ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "diff"))
+GIT_READ = (*SHELL_READ, "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)")
 NEVER = (
     "Bash(git push*)",
     "Bash(git merge*)",

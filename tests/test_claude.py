@@ -21,6 +21,8 @@ def test_session_command_has_budget_tools_and_no_persistence() -> None:
     assert "Bash(make test)" in cmd and "Bash(git push*)" in cmd
     assert "--plugin-dir" not in cmd and "--model" not in cmd
     assert "--no-session-persistence" in cmd
+    # No MCP servers: the owner's Serena wrote .serena/ into the Project and Gmail could send mail unattended.
+    assert "--strict-mcp-config" in cmd
 
 
 def test_session_command_adds_plugin_dir_and_model_when_given(tmp_path: object) -> None:
