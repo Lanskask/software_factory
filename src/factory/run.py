@@ -85,7 +85,7 @@ class Factory:
         tk = self.tracker.command
         own = ("Skill", "Agent", "Read", "Glob", "Grep", "Edit", "Write", "TodoWrite")
         git = (*GIT_READ, "Bash(git add*)", "Bash(git commit*)", "Bash(git rm*)", "Bash(git mv*)")
-        checks = tuple(f"Bash({c})" for c in self.cfg.checks)
+        checks = tuple(f"Bash({c}*)" for c in self.cfg.checks)
         return (*own, *git, f"Bash({tk}*)", *checks, *self.cfg.allowed_tools)
 
     def review_tools(self) -> tuple[str, ...]:
