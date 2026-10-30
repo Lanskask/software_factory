@@ -7,6 +7,7 @@ import dataclasses
 import sys
 from pathlib import Path
 
+from factory.bootstrap import branch_warning, next_step
 from factory.config import ConfigError, config_path, load_config, template
 from factory.plan import Planner
 from factory.run import Factory
@@ -30,6 +31,17 @@ def cmd_init(project: Path) -> int:
         with gitignore.open("a") as f:
             f.write(("\n" if lines and lines[-1] else "") + "\n".join(missing) + "\n")
         print(f"factory: added {', '.join(missing)} to {gitignore}")
+    return 0
+
+
+def cmd_bootstrap(project: Path) -> int:
+    cmd_init(project)
+    cfg = load_config(project)
+    (project / cfg.tickets_dir).mkdir(parents=True, exist_ok=True)
+    if warning := branch_warning(project, cfg):
+        print(f"factory: {warning}")
+    stage, command = next_step(project, cfg)
+    print(f"factory: {stage}. Next: {command}")
     return 0
 
 
@@ -58,6 +70,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init", help="write .factory/config.toml and the .gitignore lines").add_argument(
         "project", type=Path
     )
+    sub.add_parser(
+        "bootstrap", help="init, create the tickets folder, report the stage and the next command"
+    ).add_argument("project", type=Path)
     pl = sub.add_parser("plan", help="interactive Planning: Spec and Tickets")
     pl.add_argument("project", type=Path)
     pl.add_argument("--spec", type=Path, help="an existing Spec: skip the interview and the /to-spec step")
@@ -75,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "init":
             return cmd_init(project)
+        if args.cmd == "bootstrap":
+            return cmd_bootstrap(project)
         if args.cmd == "status":
             return cmd_status(project)
         if args.cmd == "plan" and not config_path(project).exists():
