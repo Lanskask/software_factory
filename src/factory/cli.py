@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import shutil
 import sys
 from pathlib import Path
 
@@ -45,6 +46,15 @@ def cmd_bootstrap(project: Path) -> int:
     return 0
 
 
+SKILL = Path(__file__).parents[2] / "skills" / "factory"  # shortcut: found via the editable install, not packaged
+
+
+def cmd_install_skill(dest: Path) -> int:
+    shutil.copytree(SKILL, dest / "factory", dirs_exist_ok=True)
+    print(f"factory: installed the factory skill into {dest / 'factory'}")
+    return 0
+
+
 def cmd_status(project: Path) -> int:
     cfg = load_config(project)
     tracker = Tracker(project, cfg.tickets_dir)
@@ -73,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser(
         "bootstrap", help="init, create the tickets folder, report the stage and the next command"
     ).add_argument("project", type=Path)
+    sk = sub.add_parser("install-skill", help="copy the factory skill into ~/.claude/skills")
+    sk.add_argument("--dir", type=Path, default=Path.home() / ".claude" / "skills")
     pl = sub.add_parser("plan", help="interactive Planning: Spec and Tickets")
     pl.add_argument("project", type=Path)
     pl.add_argument("--spec", type=Path, help="an existing Spec: skip the interview and the /to-spec step")
@@ -86,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--timeout-minutes", type=int, help="per Session")
     sub.add_parser("status", help="Tickets, Blocked Tickets and loose ends").add_argument("project", type=Path)
     args = p.parse_args(argv)
+    if args.cmd == "install-skill":
+        return cmd_install_skill(args.dir)
     project: Path = args.project.resolve()
     try:
         if args.cmd == "init":

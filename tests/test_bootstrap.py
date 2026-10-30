@@ -31,3 +31,8 @@ def test_empty_project_on_wrong_branch_warns_and_points_at_plan(
     main(["bootstrap", str(p)])
     out = capsys.readouterr().out
     assert "on branch master" in out and f"factory plan {p.resolve()}" in out and "--spec" not in out
+
+
+def test_install_skill_copies_the_skill_into_the_given_directory(tmp_path: Path) -> None:
+    assert main(["install-skill", "--dir", str(tmp_path)]) == 0
+    assert (tmp_path / "factory" / "SKILL.md").read_text().startswith("---\nname: factory")
