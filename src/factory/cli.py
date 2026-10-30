@@ -17,21 +17,26 @@ from factory.tracker import Tracker
 IGNORE = (".factory/*", "!.factory/config.toml")
 
 
+def rel(path: Path) -> Path:
+    """Path relative to the current directory when inside it (no `../..` climbing), for readable output."""
+    return path.relative_to(Path.cwd().resolve()) if path.is_relative_to(Path.cwd().resolve()) else path
+
+
 def cmd_init(project: Path) -> int:
     path = config_path(project)
     if path.exists():
-        print(f"factory: {path} already exists")
+        print(f"✔ {rel(path)} already exists")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(template(project))
-        print(f"factory: wrote {path}; check `checks` and `tickets_dir`, then commit it")
+        print(f"✔ wrote {rel(path)}  (check `checks` and `tickets_dir`, then commit it)")
     gitignore = project / ".gitignore"
     lines = gitignore.read_text().splitlines() if gitignore.exists() else []
     missing = [line for line in IGNORE if line not in lines]
     if missing:
         with gitignore.open("a") as f:
             f.write(("\n" if lines and lines[-1] else "") + "\n".join(missing) + "\n")
-        print(f"factory: added {', '.join(missing)} to {gitignore}")
+        print(f"✔ added {', '.join(missing)} to {rel(gitignore)}")
     return 0
 
 
@@ -41,8 +46,8 @@ def cmd_bootstrap(project: Path) -> int:
     (project / cfg.tickets_dir).mkdir(parents=True, exist_ok=True)
     if warning := branch_warning(project, cfg):
         print(f"factory: {warning}")
-    stage, command = next_step(project, cfg)
-    print(f"factory: {stage}. Next: {command}")
+    stage, command = next_step(rel(project), cfg)
+    print(f"Stage: {stage}\nNext:  {command}")
     return 0
 
 
