@@ -147,4 +147,4 @@ fails, the Run stops, as it does mid-Run.
   Commits style).
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
   Sessions write them bare. A heuristic, not a parser: commands such as `make test` are not wrapped.
-- The PR stays a draft: the Factory never marks one ready for review (see the README on review).
+- The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
