@@ -27,3 +27,10 @@ def test_code_quote_wraps_test_ids_and_paths() -> None:
 def test_code_quote_leaves_code_urls_and_links_alone() -> None:
     text = "`a/b.py` https://x.com/a/b.py [l](docs/a.md)\n```\ntests/x.py::t\n```\n"
     assert code_quote(text) == text
+
+
+def test_code_quote_wraps_make_targets_and_uv_commands_but_not_prose() -> None:
+    text = "make test and make lint exit 0; ran uv run pytest and uvx ty. We make sure it works."
+    assert code_quote(text) == (
+        "`make test` and `make lint` exit 0; ran `uv run pytest` and `uvx ty`. We make sure it works."
+    )

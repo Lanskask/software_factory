@@ -8,7 +8,9 @@ _EXT = r"(?:py|md|html|json|toml|sh|txt|ya?ml|js|ts|go|rs)"
 # A test id (`a.py::test_x`), a path ending in a known extension, or an absolute path such as `/api/config`.
 # Not after a word character, `(`, `/`, `:`, `.`, `-` or a backtick: URLs, links and code spans stay as they are.
 _PATH = rf"(?:[\w.\-]+/)*[\w.\-]+\.{_EXT}(?:::[\w\[\]\-]+)*"
-_CODE = re.compile(rf"(?<![\w(/:.`-])({_PATH}|/(?:[\w.\-]+/?)+|[\w/.\-]+::[\w:\[\]\-]+)(?![\w`])")
+# `make` plus a known target (not "make sure"), or `uv run X` / `uvx X`.
+_CMD = r"make (?:test|lint|fmt|check|setup|run|install|deploy|help|build)\b|(?:uv run|uvx) [\w\-]+"
+_CODE = re.compile(rf"(?<![\w(/:.`-])({_CMD}|{_PATH}|/(?:[\w.\-]+/?)+|[\w/.\-]+::[\w:\[\]\-]+)(?![\w`])")
 _SKIP = re.compile(r"(```.*?```|`[^`\n]*`)", re.DOTALL)
 
 
