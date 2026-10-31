@@ -215,6 +215,27 @@ def test_review_fail_gets_one_fix_session_then_passes(project: Path, monkeypatch
     assert any("missing test for the empty case" in p for p in prompts)
 
 
+def test_review_fail_is_a_lesson_the_next_ticket_is_told_to_read(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_REVIEW_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 0
+    lessons = project / ".factory" / "LESSONS.md"
+    assert "01 a: review FAIL" in lessons.read_text() and "empty case" in lessons.read_text()
+    prompts = [c[c.index("-p") + 1] for c in claude_calls(project)]
+    implement_01 = next(p for p in prompts if "Ticket 01" in p and "VERDICT" not in p)
+    implement_02 = next(p for p in prompts if "Ticket 02" in p and "VERDICT" not in p)
+    assert str(lessons) not in implement_01 and str(lessons) in implement_02
+
+
+def test_blocked_ticket_is_a_lesson(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 1
+    assert "01 a: Blocked: " in (project / ".factory" / "LESSONS.md").read_text()
+
+
 def test_high_loose_end_is_resolved_by_opus_and_the_run_continues(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -130,3 +130,11 @@ Reason: documented behavior. `/goal` has no turn limit of its own; the docs say 
 condition. The $ budget and the 90-minute timeout stay as the hard stops; the clause ends a looping Session earlier, and
 the Factory's own checks then decide whether the Ticket is done or Blocked. 60 is a guess, not measured: tune it after a
 few real Runs (the stream-json logs in `.factory/logs/` show the turn counts).
+
+## 2026-10-31 `.factory/LESSONS.md`: one line per review FAIL or Blocked Ticket, read by later Tickets
+
+Reason: best practice. The "Stop Babysitting Your Agent" talk says a fix that is not saved where the next run reads it
+evaporates with the session, and Anthropic's long-running-agent harness keeps a progress file for the same reason. A
+Session starts fresh, so a mistake caught in Ticket 01 (a review FAIL, a Blocked reason) was repeated in Ticket 03. The
+Factory writes the first line of the finding, at most 300 characters, and points the next goal at the file. Git-ignored
+like the rest of `.factory/`. Not measured yet: whether it lowers the FAIL rate; compare over a few real Runs.
