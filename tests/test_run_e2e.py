@@ -223,7 +223,7 @@ def test_review_fail_is_a_lesson_the_next_ticket_is_told_to_read(
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
     assert factory(project).run() == 0
     lessons = project / ".factory" / "LESSONS.md"
-    assert "01 a: review FAIL" in lessons.read_text() and "empty case" in lessons.read_text()
+    assert "01 a [resolved] review FAIL" in lessons.read_text() and "empty case" in lessons.read_text()
     prompts = [c[c.index("-p") + 1] for c in claude_calls(project)]
     implement_01 = next(p for p in prompts if "Ticket 01" in p and "VERDICT" not in p)
     implement_02 = next(p for p in prompts if "Ticket 02" in p and "VERDICT" not in p)
@@ -235,7 +235,7 @@ def test_lesson_keeps_the_whole_reason_on_one_line_cut_at_300_characters(project
     f.state.mkdir(parents=True, exist_ok=True)
     f.lesson(Ticket("01", "todo", True, "a"), "check `make test` failed (exit 1):\nE assert 1 == 2\n\n" + "x" * 400)
     (line,) = (project / ".factory" / "LESSONS.md").read_text().splitlines()
-    assert line.startswith("- 01 a: check `make test` failed (exit 1): E assert 1 == 2 x") and len(line) < 320
+    assert line.startswith("- 01 a [open] check `make test` failed (exit 1): E assert 1 == 2 x") and len(line) < 320
 
 
 def test_lessons_start_empty_each_run_and_a_final_review_fail_is_one_lesson(
@@ -247,14 +247,23 @@ def test_lessons_start_empty_each_run_and_a_final_review_fail_is_one_lesson(
     monkeypatch.setenv("FAKE_REVIEW_FAIL", "01")
     with_tickets(project, {"01": {"slug": "a"}})
     assert factory(project, review_rounds=1).run() == 1
-    assert [line.split(": ")[1] for line in lessons.read_text().splitlines()] == ["Blocked"]
+    assert [line.split(": ")[0] for line in lessons.read_text().splitlines()] == ["- 01 a [open] Blocked"]
 
 
 def test_blocked_ticket_is_a_lesson(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FAKE_FAIL", "01")
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
     assert factory(project).run() == 1
-    assert "01 a: Blocked: " in (project / ".factory" / "LESSONS.md").read_text()
+    assert "01 a [open] Blocked: " in (project / ".factory" / "LESSONS.md").read_text()
+
+
+def test_infrastructure_blocked_reason_is_not_a_lesson(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    f = factory(project)
+    f.state.mkdir(parents=True, exist_ok=True)
+    f.git("branch", f"{f.cfg.branch_prefix}01-a")  # an earlier Run left the branch: nothing to learn from that
+    assert "already exists" in (f.ticket(Ticket("01", "todo", True, "a"), "main", f.state / "h.md", None).blocked or "")
+    assert f.lessons is None
 
 
 def test_high_loose_end_is_resolved_by_opus_and_the_run_continues(
