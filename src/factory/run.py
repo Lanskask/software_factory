@@ -198,8 +198,8 @@ class Factory:
                 self.preview(ticket, base, handoff, previous, resolution)
                 return 0
             self.ensure_plugin()
-            if done == 0 and blocked == 0:  # the same preview as --dry-run, so the Owner sees what starts
-                self.preview(ticket, base, handoff, previous, resolution)
+            if done == 0 and blocked == 0:  # only the `next:` line; --dry-run adds the claude command
+                self.preview(ticket, base, handoff, previous, resolution, command=False)
             try:
                 out = self.ticket(ticket, base, handoff, previous, resolution)
             except PushError as e:
@@ -224,8 +224,19 @@ class Factory:
         self.say(f"Run finished: {done} pull requests, {blocked} Blocked, ${self.cost:.2f} spent")
         return 1 if blocked else 0
 
-    def preview(self, t: Ticket, base: str, handoff: Path, previous: Path | None, resolution: Path | None) -> None:
+    def preview(
+        self,
+        t: Ticket,
+        base: str,
+        handoff: Path,
+        previous: Path | None,
+        resolution: Path | None,
+        *,
+        command: bool = True,
+    ) -> None:
         print(f"next: {t.num} on {t.branch(self.cfg.branch_prefix)} from {base}", flush=True)
+        if not command:
+            return
         goal_text = goal(t, self.tracker.command, handoff, previous, self.cfg.checks, resolution)
         name = f"factory {self.project.name} {t.num} implement 1"
         print(shlex.join(self.command(goal_text, review=False, name=name)), flush=True)
@@ -286,12 +297,14 @@ class Factory:
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
         self.log_loose_ends(t, branch, handoff)  # before publishing: a failed push must not lose them
+        self.say(f"{t.num}: publishing, pushing {branch} and opening a draft pull request")
         self.publish(t.num, t.slug, base, branch, handoff, review_log)
         return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(handoff.read_text()))
 
     def verify(self, t: Ticket, base: str, res: SessionResult, handoff: Path) -> str | None:
         """Why the Ticket is not done; None when it is. The Factory's own checks outrank what the Session says."""
         reason = blocked_reason(res.text)
+        self.say(f"{t.num}: checking the Ticket is done, tree clean, commits, Handoff, {', '.join(self.cfg.checks)}")
         problem = self.objective_problem(t, base, handoff)
         if problem:
             return reason or (f"session failed: {res.text}" if not res.ok else problem)

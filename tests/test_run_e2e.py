@@ -308,13 +308,16 @@ def test_publish_pushes_a_base_branch_that_is_missing_on_origin(project: Path) -
     assert "refs/heads/factory/01-a" in git(project, "ls-remote", "--heads", "origin")
 
 
-def test_real_run_prints_the_dry_run_preview_before_the_first_session(
+def test_real_run_prints_the_next_line_and_the_stages_but_not_the_claude_command(
     project: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with_tickets(project, {"01": {"slug": "a"}})
     assert factory(project).run() == 0
     out = capsys.readouterr().out
     assert out.index("next: 01 on factory/01-a from main") < out.index("01: implement session 1")
+    assert "/goal" not in out
+    stages = ["implement session 1", "checking", "review session 1", "publishing"]
+    assert [out.index(x) for x in stages] == sorted(out.index(x) for x in stages)
 
 
 def test_review_session_may_run_the_configured_checks(project: Path) -> None:
