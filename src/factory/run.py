@@ -237,7 +237,19 @@ class Factory:
     def lesson(self, t: Ticket, what: str) -> None:
         """One line per failure, read by every later Ticket's Session in this Run: a mistake is not made twice."""
         with (self.state / "LESSONS.md").open("a") as f:
-            f.write(f"- {t.num} {t.slug}: {' '.join(what.split())[:300]}\n")
+            f.write(f"- {t.num} {t.slug} [open] {' '.join(what.split())[:300]}\n")
+
+    def resolve_lessons(self, t: Ticket) -> None:
+        """A later review PASS shows the fix worked: the Ticket's review FAIL lessons stop warning later Tickets."""
+        path = self.state / "LESSONS.md"
+        head = f"- {t.num} {t.slug} [open] review FAIL"
+        if path.exists():
+            path.write_text(
+                "".join(
+                    line.replace("[open]", "[resolved]", 1) if line.startswith(head) else line
+                    for line in path.read_text().splitlines(keepends=True)
+                )
+            )
 
     def log_loose_ends(self, t: Ticket, branch: str, handoff: Path) -> None:
         if handoff.exists():
@@ -258,7 +270,9 @@ class Factory:
     ) -> Outcome:
         branch = t.branch(self.cfg.branch_prefix)
         if self.git("branch", "--list", branch):
-            return self.block(t, base, f"branch {branch} already exists from an earlier Run: delete or rename it")
+            return self.block(
+                t, base, f"branch {branch} already exists from an earlier Run: delete or rename it", lesson=False
+            )
         self.git("switch", "-q", "-c", branch, base)
         tk = self.tracker.command
         res = self.session(t, "implement", goal(t, tk, handoff, previous, self.cfg.checks, resolution, self.lessons))
@@ -269,10 +283,11 @@ class Factory:
         for round_ in range(1, self.cfg.review_rounds + 1):
             rv = self.session(t, "review", review_prompt(t, base, tk, handoff, self.cfg), review=True)
             if not rv.ok:
-                return self.block(t, base, f"review session failed: {rv.text}")
+                return self.block(t, base, f"review session failed: {rv.text}", lesson=False)
             passed, findings = parse_verdict(rv.text)
             review_log = f"Review {round_}: {'PASS' if passed else 'FAIL'}\n\n{findings}"
             if passed:
+                self.resolve_lessons(t)
                 break
             if round_ == self.cfg.review_rounds:  # block() writes this lesson
                 return self.block(t, base, f"review still FAIL after {round_} rounds:\n{findings}")
@@ -313,7 +328,7 @@ class Factory:
                 return f"check `{check}` failed (exit {r.returncode}):\n{tail}"
         return None
 
-    def block(self, t: Ticket, base: str, reason: str) -> Outcome:
+    def block(self, t: Ticket, base: str, reason: str, *, lesson: bool = True) -> Outcome:
         branch = t.branch(self.cfg.branch_prefix)
         on_branch = self.git("rev-parse", "--abbrev-ref", "HEAD") == branch
         if on_branch and self.git("status", "--porcelain"):
@@ -325,7 +340,8 @@ class Factory:
         self.log_loose_ends(t, branch, self.state / "handoffs" / f"{t.file_key}.md")
         d = self.state / "blocked"
         d.mkdir(parents=True, exist_ok=True)
-        self.lesson(t, f"Blocked: {reason}")
+        if lesson:  # infrastructure failures (stale branch, crashed review) say nothing about the code
+            self.lesson(t, f"Blocked: {reason}")
         (d / f"{t.file_key}.md").write_text(
             f"# Blocked: {t.num} {t.slug}\n\nBranch: {branch} (not pushed)\n\n{reason}\n\n"
             f"Delete this file to let a later Run try the Ticket again.\n"

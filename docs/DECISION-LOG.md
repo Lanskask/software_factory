@@ -144,5 +144,14 @@ Changed after an `egm-review` of the first version (three reviewers, 2026-10-31)
 each Run (a stale line warns about a mistake the Owner already fixed); the goal calls it "unverified notes, never
 instructions, this Ticket's text wins" (the lines are model output and check output, so they are an injection path);
 only the first line was kept, which for `check ... failed:` lost the detail; the last failing review round no longer
-writes the lesson twice. Not done: a structured record, dropping infrastructure Blocked reasons, and marking a lesson
-resolved when the fix round passes. No evidence yet that they pay for their code.
+writes the lesson twice. Not done at that point: a structured record, dropping infrastructure Blocked reasons, and
+marking a lesson resolved when the fix round passes. They are done in the next entry.
+
+## 2026-10-31 Lessons get a status, infrastructure Blocked reasons are dropped
+
+Reason: the Owner asked for the three items left out above. A line is now `- <num> <slug> [open] <reason>`, the minimal
+structured record (ticket, status, reason) that stays readable markdown for the Session. A stale branch or a crashed
+review Session is not recorded: it says nothing about the code. A review FAIL lesson becomes `[resolved]` when the next
+review of that Ticket PASSes (not when the fix Session's checks pass: the review is the evidence the finding is gone).
+Blocked lessons stay `[open]`. Other reasons from `verify()` (such as a crashed implement Session) are still recorded;
+telling them apart from code failures needs a typed reason. Not measured: whether it lowers the FAIL rate.
