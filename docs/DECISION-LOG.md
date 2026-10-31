@@ -146,5 +146,5 @@ fails, the Run stops, as it does mid-Run.
   Ticket's optional `**Type:**` line (`test`, `docs`, ...), default `feat`. Reason: the Owner's requirement (Conventional
   Commits style).
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
-  Sessions write them bare. A heuristic, not a parser: commands such as `make test` are not wrapped.
+  Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
 - The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
