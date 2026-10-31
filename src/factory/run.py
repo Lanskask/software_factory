@@ -165,6 +165,8 @@ class Factory:
         except PushError as e:
             self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
             return 1
+        if not dry_run:  # lessons are per Run: a stale one would warn about a mistake the Owner already fixed
+            (self.state / "LESSONS.md").unlink(missing_ok=True)
         base = self.git("rev-parse", "--abbrev-ref", "HEAD")
         skipped: set[str] = set()
         previous: Path | None = None
@@ -233,10 +235,9 @@ class Factory:
         return path if path.exists() else None
 
     def lesson(self, t: Ticket, what: str) -> None:
-        """One line per failure, read by every later Ticket's Session: a mistake is not made twice in a Run."""
-        first = next((line.strip() for line in what.splitlines() if line.strip()), what)
+        """One line per failure, read by every later Ticket's Session in this Run: a mistake is not made twice."""
         with (self.state / "LESSONS.md").open("a") as f:
-            f.write(f"- {t.num} {t.slug}: {first[:300]}\n")
+            f.write(f"- {t.num} {t.slug}: {' '.join(what.split())[:300]}\n")
 
     def log_loose_ends(self, t: Ticket, branch: str, handoff: Path) -> None:
         if handoff.exists():
@@ -271,12 +272,11 @@ class Factory:
                 return self.block(t, base, f"review session failed: {rv.text}")
             passed, findings = parse_verdict(rv.text)
             review_log = f"Review {round_}: {'PASS' if passed else 'FAIL'}\n\n{findings}"
-            if not passed:
-                self.lesson(t, f"review FAIL: {findings}")
             if passed:
                 break
-            if round_ == self.cfg.review_rounds:
+            if round_ == self.cfg.review_rounds:  # block() writes this lesson
                 return self.block(t, base, f"review still FAIL after {round_} rounds:\n{findings}")
+            self.lesson(t, f"review FAIL: {findings}")
             fx = self.session(t, "fix", fix_goal(t, tk, handoff, findings, self.cfg.checks))
             problem = self.verify(t, base, fx, handoff)
             if problem:
