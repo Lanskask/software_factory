@@ -178,18 +178,11 @@ class Factory:
             handoff = self.state / "handoffs" / f"{ticket.file_key}.md"
             if dry_run:
                 self.plugin_dir = str(self.state / "plugin") if self.skills() else None
-                print(f"next: {ticket.num} on {ticket.branch(self.cfg.branch_prefix)} from {base}")
-                print(
-                    shlex.join(
-                        self.command(
-                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks, resolution),
-                            review=False,
-                            name=f"factory {self.project.name} {ticket.num} implement 1",
-                        )
-                    )
-                )
+                self.preview(ticket, base, handoff, previous, resolution)
                 return 0
             self.ensure_plugin()
+            if done == 0 and blocked == 0:  # the same preview as --dry-run, so the Owner sees what starts
+                self.preview(ticket, base, handoff, previous, resolution)
             try:
                 out = self.ticket(ticket, base, handoff, previous, resolution)
             except PushError as e:
@@ -213,6 +206,12 @@ class Factory:
                     return 1
         self.say(f"Run finished: {done} pull requests, {blocked} Blocked, ${self.cost:.2f} spent")
         return 1 if blocked else 0
+
+    def preview(self, t: Ticket, base: str, handoff: Path, previous: Path | None, resolution: Path | None) -> None:
+        print(f"next: {t.num} on {t.branch(self.cfg.branch_prefix)} from {base}", flush=True)
+        goal_text = goal(t, self.tracker.command, handoff, previous, self.cfg.checks, resolution)
+        name = f"factory {self.project.name} {t.num} implement 1"
+        print(shlex.join(self.command(goal_text, review=False, name=name)), flush=True)
 
     def resolve(self, t: Ticket, handoff: Path) -> Path | None:
         """A read-only Session on `resolve_model` decides what to do about the [high] items; None if it fails."""

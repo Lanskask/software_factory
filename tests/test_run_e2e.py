@@ -285,6 +285,15 @@ def test_dry_run_spends_nothing(project: Path, capsys: pytest.CaptureFixture[str
     assert claude_calls(project) == [] and "/goal" in capsys.readouterr().out
 
 
+def test_real_run_prints_the_dry_run_preview_before_the_first_session(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project).run() == 0
+    out = capsys.readouterr().out
+    assert out.index("next: 01 on factory/01-a from main") < out.index("01: implement session 1")
+
+
 def test_review_session_may_run_the_configured_checks(project: Path) -> None:
     f = factory(project)
     assert "Bash(test -f t/tickets.json*)" in f.review_tools()
