@@ -100,11 +100,29 @@ class Planner:
             model=self.cfg.model,
             plugin_dir=None,
             permission_mode="acceptEdits",
+            name=f"factory {self.project.name} plan-bootstrap",
             claude=self.claude,
         )
         res = run_session(cmd, self.project, log, 30 * 60)
         self.say(f"bootstrap {'finished' if res.ok else 'failed: ' + res.text}, ${res.cost_usd:.2f}")
+        self.commit_egm_docs()
         return res.ok
+
+    def commit_egm_docs(self) -> None:
+        """The unattended bootstrap may not commit, so the Factory commits the docs it wrote, and only those."""
+        ls = subprocess.run(
+            ["git", "ls-files", "--others", "--modified", "--exclude-standard", "--", ":(glob)**/EGM_DOC.md"],
+            cwd=self.project,
+            capture_output=True,
+            text=True,
+        )
+        docs = ls.stdout.splitlines()
+        if ls.returncode or not docs:
+            return
+        subprocess.run(["git", "add", "--", *docs], cwd=self.project, check=True)
+        msg = "factory: EGM_DOC.md files from /egm-bootstrap"
+        subprocess.run(["git", "commit", "-q", "-m", msg, "--", *docs], cwd=self.project, check=True)
+        self.say(f"committed {len(docs)} EGM_DOC.md files")
 
     def plan(self, spec: Path | None, *, bootstrap: bool) -> int:
         if self.tracker.exists():
@@ -113,7 +131,8 @@ class Planner:
         steps = chain(spec=spec is not None)
         if not (bootstrap and self.bootstrap()):
             steps = (BOOTSTRAP, *steps)
-        cmd = [self.claude, "--append-system-prompt", planning_rules(self.cfg, spec, steps)]
+        cmd = [self.claude, "--name", f"factory {self.project.name} plan"]
+        cmd += ["--append-system-prompt", planning_rules(self.cfg, spec, steps)]
         if self.skills:
             cmd += ["--plugin-dir", str(build_plugin(self.skills, self.state / "plan-plugin", self.installed))]
         if self.cfg.model:

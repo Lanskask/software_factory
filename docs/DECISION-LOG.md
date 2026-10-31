@@ -101,3 +101,16 @@ reads it and the Run stops after that pull request.
 Reason: measured fact. In live run 4 the reviewer could not run `make test` (permission refused) and judged from the
 diff alone. Review Sessions now get `Bash(<check>*)` for each configured check. They stay unable to edit files or
 commit.
+
+## 2026-10-30 The Factory commits the files it writes, and only those
+
+Reason: the Owner's requirement, from the first real test. `factory init` (config and `.gitignore` lines) and the
+unattended `/egm-bootstrap` (`EGM_DOC.md` files, which may not commit) left the tree dirty, and `factory run` then
+refused to start. The Factory now commits exactly those paths with `git commit -- <paths>`, so the Owner's own staged
+or uncommitted work stays untouched. A `.gitignore` that already had the Owner's uncommitted edits is not committed.
+Other dirt (tool state like `.serena/cache`) is still the Owner's call: `factory run` lists the files instead.
+
+## 2026-10-30 Every Session the Factory starts gets a `--name`
+
+Reason: the Owner's requirement. Names are `factory <project> <ticket> <kind> <n>`, `factory <project> plan` and
+`factory <project> plan-bootstrap`, so the sessions are easy to find in the session list.

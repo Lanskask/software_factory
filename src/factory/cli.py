@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,20 +25,37 @@ def rel(path: Path) -> Path:
 
 def cmd_init(project: Path) -> int:
     path = config_path(project)
+    written: list[Path] = []
     if path.exists():
         print(f"✔ {rel(path)} already exists")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(template(project))
-        print(f"✔ wrote {rel(path)}  (check `checks` and `tickets_dir`, then commit it)")
+        written.append(path)
+        print(f"✔ wrote {rel(path)}  (check `checks` and `tickets_dir`, commit any edit)")
     gitignore = project / ".gitignore"
     lines = gitignore.read_text().splitlines() if gitignore.exists() else []
     missing = [line for line in IGNORE if line not in lines]
     if missing:
+        owners_edits = subprocess.run(
+            ["git", "status", "--porcelain", "--", ".gitignore"], cwd=project, capture_output=True, text=True
+        ).stdout
         with gitignore.open("a") as f:
             f.write(("\n" if lines and lines[-1] else "") + "\n".join(missing) + "\n")
+        if not owners_edits:  # never commit the Owner's uncommitted lines along with ours
+            written.append(gitignore)
         print(f"✔ added {', '.join(missing)} to {rel(gitignore)}")
+    if written:
+        commit(project, [str(p.relative_to(project)) for p in written])
     return 0
+
+
+def commit(project: Path, paths: list[str]) -> None:
+    """Commit the files the Factory wrote, and only those, so that a Run starts from a clean tree."""
+    msg = "factory: config and .gitignore lines"
+    ok = subprocess.run(["git", "add", "--", *paths], cwd=project, capture_output=True).returncode == 0
+    ok = ok and subprocess.run(["git", "commit", "-q", "-m", msg, "--", *paths], cwd=project).returncode == 0
+    print(f"✔ committed {', '.join(paths)}" if ok else f"factory: could not commit {', '.join(paths)}: do it yourself")
 
 
 def cmd_bootstrap(project: Path) -> int:

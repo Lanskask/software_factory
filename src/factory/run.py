@@ -3,6 +3,7 @@ before the Factory pushes it and opens a draft pull request. Nothing is ever mer
 
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import subprocess
@@ -96,7 +97,7 @@ class Factory:
         own = ("Skill", "Agent", "Read", "Glob", "Grep", *GIT_READ)
         return (*own, f"Bash({tk} show*)", f"Bash({tk} status*)", *checks)
 
-    def command(self, prompt: str, *, review: bool) -> list[str]:
+    def command(self, prompt: str, *, review: bool, name: str) -> list[str]:
         return session_command(
             prompt,
             system=session_rules(self.cfg, self.tracker.command),
@@ -106,6 +107,7 @@ class Factory:
             model=self.cfg.model,
             plugin_dir=self.plugin_dir,
             permission_mode="default" if review else "acceptEdits",
+            name=name,
             claude=self.claude,
         )
 
@@ -113,7 +115,8 @@ class Factory:
         n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
         log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
         self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
-        res = run_session(self.command(prompt, review=review), self.project, log, self.cfg.timeout_minutes * 60)
+        cmd = self.command(prompt, review=review, name=f"factory {self.project.name} {ticket.num} {kind} {n}")
+        res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
         self.cost += res.cost_usd
         self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
         return res
@@ -121,8 +124,11 @@ class Factory:
     # --- the Run -------------------------------------------------------------------------------------------------
 
     def preflight(self) -> str | None:
-        if self.git("status", "--porcelain"):
-            return "the working tree is not clean: commit or stash first"
+        if dirty := self.git("status", "--porcelain"):
+            return (
+                "the working tree is not clean. Commit what belongs to the Project (docs, config), git-ignore local "
+                "tool state (caches, live sessions), then run again:\n" + dirty
+            )
         ignored = subprocess.run(["git", "check-ignore", "-q", ".factory/handoffs/x.md"], cwd=self.project)
         if ignored.returncode != 0:
             return "`.factory/` is not git-ignored: run `factory init` or add `.factory/*` and `!.factory/config.toml`"
@@ -147,6 +153,11 @@ class Factory:
         if problem:
             self.say(problem)
             return 1
+        try:
+            self.retry_unpublished()
+        except PushError as e:
+            self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
+            return 1
         base = self.git("rev-parse", "--abbrev-ref", "HEAD")
         skipped: set[str] = set()
         previous: Path | None = None
@@ -163,7 +174,9 @@ class Factory:
                 print(
                     shlex.join(
                         self.command(
-                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks), review=False
+                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks),
+                            review=False,
+                            name=f"factory {self.project.name} {ticket.num} implement 1",
                         )
                     )
                 )
@@ -172,7 +185,7 @@ class Factory:
             try:
                 out = self.ticket(ticket, base, handoff, previous)
             except PushError as e:
-                self.say(f"{ticket.num}: {e}. Stopping: fix the remote or gh, then run again.")
+                self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
                 return 1
             if out.blocked:
                 blocked += 1
@@ -223,7 +236,7 @@ class Factory:
             problem = self.verify(t, base, fx, handoff)
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
-        self.publish(t, base, branch, handoff, review_log)
+        self.publish(t.num, t.slug, base, branch, handoff, review_log)
         loose = handoff.read_text()
         with (self.state / "LOOSE-ENDS.md").open("a") as f:
             f.write(f"\n<!-- {t.num} {t.slug}, branch {branch} -->\n{loose.rstrip()}\n")
@@ -274,21 +287,32 @@ class Factory:
         )
         return Outcome(blocked=reason)
 
-    def publish(self, t: Ticket, base: str, branch: str, handoff: Path, review_log: str) -> None:
+    def retry_unpublished(self) -> None:
+        """A Ticket whose push or pull request failed is done in the tracker, so only this retry ever publishes it."""
+        for f in sorted((self.state / "unpublished").glob("*.json")):
+            a = json.loads(f.read_text())
+            self.publish(a["num"], a["slug"], a["base"], a["branch"], Path(a["handoff"]), a["review_log"])
+
+    def publish(self, num: str, slug: str, base: str, branch: str, handoff: Path, review_log: str) -> None:
+        pending = self.state / "unpublished" / f"{num}-{slug}.json"
+        pending.parent.mkdir(parents=True, exist_ok=True)
+        record = {"num": num, "slug": slug, "base": base, "branch": branch, "handoff": str(handoff)}
+        pending.write_text(json.dumps({**record, "review_log": review_log}))
         push = subprocess.run(
             ["git", "push", "-q", "-u", "origin", branch], cwd=self.project, capture_output=True, text=True
         )
         if push.returncode != 0:
-            raise PushError(f"git push failed: {push.stderr.strip()}")
+            raise PushError(f"{num}: git push failed: {push.stderr.strip()}")
         body = (
-            f"Ticket {t.num} ({t.slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
-            f"## Ticket\n\n{self.tracker.show(t.num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
+            f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
+            f"## Ticket\n\n{self.tracker.show(num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
         )
         pr = subprocess.run(
-            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch, "--title", f"{t.num} {t.slug}",
+            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch, "--title", f"{num} {slug}",
              "--body", body],
             cwd=self.project, capture_output=True, text=True,
         )  # fmt: skip
         if pr.returncode != 0:
-            raise PushError(f"gh pr create failed: {pr.stderr.strip()}")
-        self.say(f"{t.num}: draft pull request {pr.stdout.strip()}")
+            raise PushError(f"{num}: gh pr create failed: {pr.stderr.strip()}")
+        pending.unlink()
+        self.say(f"{num}: draft pull request {pr.stdout.strip()}")

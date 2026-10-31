@@ -76,6 +76,9 @@ result("DONE")
 FAKE_GH = r"""
 import json, os, sys
 with open(os.environ["FAKE_GH_LOG"], "a") as f: f.write(json.dumps(sys.argv[1:]) + "\n")
+if os.environ.get("FAKE_GH_FAIL"):
+    print("GraphQL: Base ref must be a branch", file=sys.stderr)
+    sys.exit(1)
 print("https://github.com/o/r/pull/1")
 """
 
@@ -153,6 +156,28 @@ def test_run_stacks_branches_pushes_and_opens_draft_prs(project: Path) -> None:
     sessions = claude_calls(project)
     assert len(sessions) == 4  # implement + review per ticket
     assert all("Bash(git push*)" in c for c in sessions)
+    names = [c[c.index("--name") + 1] for c in sessions]
+    assert names == [
+        "factory proj 01 implement 1",
+        "factory proj 01 review 1",
+        "factory proj 02 implement 1",
+        "factory proj 02 review 1",
+    ]
+
+
+def test_failed_publish_is_retried_by_the_next_run_before_new_tickets(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    monkeypatch.setenv("FAKE_GH_FAIL", "1")
+    assert factory(project).run() == 1
+    git(project, "push", "-q", "origin", "--delete", "factory/01-a")  # the remote lost it, as in a fresh remote
+    monkeypatch.delenv("FAKE_GH_FAIL")
+    assert factory(project).run() == 0
+    assert git(project, "ls-remote", "--heads", "origin").count("refs/heads/factory/") == 2
+    created = [c for c in gh_calls(project) if c[1] == "create"][1:]  # the first call is the failed attempt
+    assert [c[c.index("--head") + 1] for c in created] == ["factory/01-a", "factory/02-b"]
+    assert [c[c.index("--base") + 1] for c in created] == ["main", "factory/01-a"]
 
 
 def test_blocked_ticket_is_recorded_its_dependent_skipped_and_the_rest_run(
@@ -212,11 +237,12 @@ def test_ticket_mentioning_cloud_tools_is_skipped(project: Path) -> None:
     assert len(gh_calls(project)) == 1
 
 
-def test_dirty_tree_refuses_to_start(project: Path) -> None:
+def test_dirty_tree_refuses_to_start_and_names_the_files(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with_tickets(project, {"01": {"slug": "a"}})
     (project / "stray.txt").write_text("x")
     assert factory(project).run() == 1
     assert claude_calls(project) == []
+    assert "?? stray.txt" in capsys.readouterr().out
 
 
 def test_dry_run_spends_nothing(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
