@@ -18,6 +18,7 @@ import pytest
 
 from factory.config import Config
 from factory.run import Factory
+from factory.tracker import Ticket
 
 FAKE_TICKETS = r"""
 import json, sys
@@ -213,6 +214,47 @@ def test_review_fail_gets_one_fix_session_then_passes(project: Path, monkeypatch
     prompts = [c[c.index("-p") + 1] for c in claude_calls(project)]
     assert sum("VERDICT" in p for p in prompts) == 2
     assert any("missing test for the empty case" in p for p in prompts)
+
+
+def test_review_fail_is_a_lesson_the_next_ticket_is_told_to_read(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_REVIEW_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 0
+    lessons = project / ".factory" / "LESSONS.md"
+    assert "01 a: review FAIL" in lessons.read_text() and "empty case" in lessons.read_text()
+    prompts = [c[c.index("-p") + 1] for c in claude_calls(project)]
+    implement_01 = next(p for p in prompts if "Ticket 01" in p and "VERDICT" not in p)
+    implement_02 = next(p for p in prompts if "Ticket 02" in p and "VERDICT" not in p)
+    assert str(lessons) not in implement_01 and str(lessons) in implement_02
+
+
+def test_lesson_keeps_the_whole_reason_on_one_line_cut_at_300_characters(project: Path) -> None:
+    f = factory(project)
+    f.state.mkdir(parents=True, exist_ok=True)
+    f.lesson(Ticket("01", "todo", True, "a"), "check `make test` failed (exit 1):\nE assert 1 == 2\n\n" + "x" * 400)
+    (line,) = (project / ".factory" / "LESSONS.md").read_text().splitlines()
+    assert line.startswith("- 01 a: check `make test` failed (exit 1): E assert 1 == 2 x") and len(line) < 320
+
+
+def test_lessons_start_empty_each_run_and_a_final_review_fail_is_one_lesson(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lessons = project / ".factory" / "LESSONS.md"
+    lessons.parent.mkdir(parents=True, exist_ok=True)
+    lessons.write_text("- 99 old: from an earlier Run\n")
+    monkeypatch.setenv("FAKE_REVIEW_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, review_rounds=1).run() == 1
+    assert [line.split(": ")[1] for line in lessons.read_text().splitlines()] == ["Blocked"]
+
+
+def test_blocked_ticket_is_a_lesson(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 1
+    assert "01 a: Blocked: " in (project / ".factory" / "LESSONS.md").read_text()
 
 
 def test_high_loose_end_is_resolved_by_opus_and_the_run_continues(

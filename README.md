@@ -49,6 +49,9 @@ If the Project already has Tickets in the `/to-tickets` format, skip `plan`.
 A Session's BLOCKED claim does not override the checks: if the Ticket is done and every check passes, the claim becomes
 a `[high]` loose end instead. Sessions load no MCP servers (`--strict-mcp-config`).
 
+Every review FAIL and every Blocked Ticket adds a line to `.factory/LESSONS.md`; later Tickets' goals tell their Session
+to read it first.
+
 A Ticket that fails any step becomes Blocked: the reason goes to `.factory/blocked/<num>.md`, its work stays committed
 on its unpushed branch, and Tickets that depend on it are not run. Two Blocked Tickets stop the Run. Delete the file to
 let a later Run retry (rename the old branch first).
