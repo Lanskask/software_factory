@@ -26,6 +26,7 @@ class Config:
     allowed_tools: tuple[str, ...] = ()  # extra --allowedTools entries for implementation Sessions
     skip_pattern: str = DEFAULT_SKIP
     model: str | None = None
+    resolve_model: str = "opus"  # decides what to do about a [high] loose end, so the Run does not stop
     budget_usd: float = 5.0
     review_budget_usd: float = 2.0
     timeout_minutes: int = 90
@@ -102,6 +103,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # allowed_tools = ["Bash(bun run test*)"]  # extra tools a Session may use without asking
 # skip_pattern = "{DEFAULT_SKIP}"
 # model = "opus"
+# resolve_model = "opus"     # the read-only Session that decides on a [high] loose end
 # budget_usd = 5.0           # per implementation Session
 # review_budget_usd = 2.0    # per review Session
 # timeout_minutes = 90       # per Session

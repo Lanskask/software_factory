@@ -41,7 +41,10 @@ If the Project already has Tickets in the `/to-tickets` format, skip `plan`.
 4. Review Session, fresh, cannot edit files, may run the `checks`: `code-review` (plus `security-and-hardening` where it
    applies), ending in `VERDICT: PASS|FAIL`. A FAIL gets one fix Session and another review.
 5. The Factory runs `git push` and `gh pr create --draft`, with the previous Ticket's branch as the base.
-6. The Handoff is appended to `.factory/LOOSE-ENDS.md`. A `[high]` item stops the Run so you read it first.
+6. The Handoff is appended to `.factory/LOOSE-ENDS.md` (also for a Blocked Ticket, and before the push). A `[high]` item
+   does not stop the Run: a read-only Session on `resolve_model` (default `opus`, with web research) decides what to do,
+   its answer goes to `.factory/resolutions/` and `LOOSE-ENDS.md`, and the next Ticket's Session does the steps marked
+   `NOW` first. If the resolver itself fails, the Run stops.
 
 A Session's BLOCKED claim does not override the checks: if the Ticket is done and every check passes, the claim becomes
 a `[high]` loose end instead. Sessions load no MCP servers (`--strict-mcp-config`).

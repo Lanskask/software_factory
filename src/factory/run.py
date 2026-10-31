@@ -18,6 +18,7 @@ from factory.prompts import (
     goal,
     has_high_loose_end,
     parse_verdict,
+    resolve_prompt,
     review_prompt,
     session_rules,
 )
@@ -97,25 +98,31 @@ class Factory:
         own = ("Skill", "Agent", "Read", "Glob", "Grep", *GIT_READ)
         return (*own, f"Bash({tk} show*)", f"Bash({tk} status*)", *checks)
 
-    def command(self, prompt: str, *, review: bool, name: str) -> list[str]:
+    def command(self, prompt: str, *, review: bool, name: str, resolve: bool = False) -> list[str]:
+        review = review or resolve  # the resolver is a read-only Session too, with web research added
         return session_command(
             prompt,
             system=session_rules(self.cfg, self.tracker.command),
-            allowed=self.review_tools() if review else self.implement_tools(),
+            allowed=(*self.review_tools(), *(("WebSearch", "WebFetch") if resolve else ()))
+            if review
+            else self.implement_tools(),
             disallowed=(*NEVER, "Edit", "Write", "NotebookEdit", "Bash(git commit*)") if review else NEVER,
             budget_usd=self.cfg.review_budget_usd if review else self.cfg.budget_usd,
-            model=self.cfg.model,
+            model=self.cfg.resolve_model if resolve else self.cfg.model,
             plugin_dir=self.plugin_dir,
             permission_mode="default" if review else "acceptEdits",
             name=name,
             claude=self.claude,
         )
 
-    def session(self, ticket: Ticket, kind: str, prompt: str, *, review: bool = False) -> SessionResult:
+    def session(
+        self, ticket: Ticket, kind: str, prompt: str, *, review: bool = False, resolve: bool = False
+    ) -> SessionResult:
         n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
         log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
         self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
-        cmd = self.command(prompt, review=review, name=f"factory {self.project.name} {ticket.num} {kind} {n}")
+        name = f"factory {self.project.name} {ticket.num} {kind} {n}"
+        cmd = self.command(prompt, review=review, name=name, resolve=resolve)
         res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
         self.cost += res.cost_usd
         self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
@@ -161,6 +168,7 @@ class Factory:
         base = self.git("rev-parse", "--abbrev-ref", "HEAD")
         skipped: set[str] = set()
         previous: Path | None = None
+        resolution: Path | None = None
         done, blocked = 0, 0
         for _ in range(self.cfg.max_tickets):
             ticket = self.next_ticket(skipped)
@@ -170,20 +178,13 @@ class Factory:
             handoff = self.state / "handoffs" / f"{ticket.file_key}.md"
             if dry_run:
                 self.plugin_dir = str(self.state / "plugin") if self.skills() else None
-                print(f"next: {ticket.num} on {ticket.branch(self.cfg.branch_prefix)} from {base}")
-                print(
-                    shlex.join(
-                        self.command(
-                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks),
-                            review=False,
-                            name=f"factory {self.project.name} {ticket.num} implement 1",
-                        )
-                    )
-                )
+                self.preview(ticket, base, handoff, previous, resolution)
                 return 0
             self.ensure_plugin()
+            if done == 0 and blocked == 0:  # the same preview as --dry-run, so the Owner sees what starts
+                self.preview(ticket, base, handoff, previous, resolution)
             try:
-                out = self.ticket(ticket, base, handoff, previous)
+                out = self.ticket(ticket, base, handoff, previous, resolution)
             except PushError as e:
                 self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
                 return 1
@@ -195,12 +196,41 @@ class Factory:
                     break
                 continue
             done += 1
-            base, previous = out.branch, out.handoff
-            if out.high:
-                self.say(f"{ticket.num}: the Handoff has a [high] loose end. Stopping: read .factory/LOOSE-ENDS.md")
-                return 1
+            base, previous, resolution = out.branch, out.handoff, None
+            if out.high and out.handoff:
+                resolution = self.resolve(ticket, out.handoff)
+                if resolution is None:
+                    self.say(
+                        f"{ticket.num}: [high] loose end, the resolver failed. Stopping: read .factory/LOOSE-ENDS.md"
+                    )
+                    return 1
         self.say(f"Run finished: {done} pull requests, {blocked} Blocked, ${self.cost:.2f} spent")
         return 1 if blocked else 0
+
+    def preview(self, t: Ticket, base: str, handoff: Path, previous: Path | None, resolution: Path | None) -> None:
+        print(f"next: {t.num} on {t.branch(self.cfg.branch_prefix)} from {base}", flush=True)
+        goal_text = goal(t, self.tracker.command, handoff, previous, self.cfg.checks, resolution)
+        name = f"factory {self.project.name} {t.num} implement 1"
+        print(shlex.join(self.command(goal_text, review=False, name=name)), flush=True)
+
+    def resolve(self, t: Ticket, handoff: Path) -> Path | None:
+        """A read-only Session on `resolve_model` decides what to do about the [high] items; None if it fails."""
+        res = self.session(t, "resolve", resolve_prompt(t, self.tracker.command, handoff), resolve=True)
+        if not res.ok or not res.text.strip():
+            return None
+        path = self.state / "resolutions" / f"{t.file_key}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(res.text.rstrip() + "\n")
+        with (self.state / "LOOSE-ENDS.md").open("a") as f:
+            f.write(
+                f"\n<!-- {t.num} {t.slug}: decision of the {self.cfg.resolve_model} resolver -->\n{res.text.rstrip()}\n"
+            )
+        return path
+
+    def log_loose_ends(self, t: Ticket, branch: str, handoff: Path) -> None:
+        if handoff.exists():
+            with (self.state / "LOOSE-ENDS.md").open("a") as f:
+                f.write(f"\n<!-- {t.num} {t.slug}, branch {branch} -->\n{handoff.read_text().rstrip()}\n")
 
     def skills(self) -> tuple[str, ...]:
         return (*self.cfg.implement_skills, *self.cfg.review_skills)
@@ -211,13 +241,15 @@ class Factory:
 
     # --- one Ticket ----------------------------------------------------------------------------------------------
 
-    def ticket(self, t: Ticket, base: str, handoff: Path, previous: Path | None) -> Outcome:
+    def ticket(
+        self, t: Ticket, base: str, handoff: Path, previous: Path | None, resolution: Path | None = None
+    ) -> Outcome:
         branch = t.branch(self.cfg.branch_prefix)
         if self.git("branch", "--list", branch):
             return self.block(t, base, f"branch {branch} already exists from an earlier Run: delete or rename it")
         self.git("switch", "-q", "-c", branch, base)
         tk = self.tracker.command
-        res = self.session(t, "implement", goal(t, tk, handoff, previous, self.cfg.checks))
+        res = self.session(t, "implement", goal(t, tk, handoff, previous, self.cfg.checks, resolution))
         problem = self.verify(t, base, res, handoff)
         if problem:
             return self.block(t, base, problem)
@@ -236,11 +268,9 @@ class Factory:
             problem = self.verify(t, base, fx, handoff)
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
+        self.log_loose_ends(t, branch, handoff)  # before publishing: a failed push must not lose them
         self.publish(t.num, t.slug, base, branch, handoff, review_log)
-        loose = handoff.read_text()
-        with (self.state / "LOOSE-ENDS.md").open("a") as f:
-            f.write(f"\n<!-- {t.num} {t.slug}, branch {branch} -->\n{loose.rstrip()}\n")
-        return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(loose))
+        return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(handoff.read_text()))
 
     def verify(self, t: Ticket, base: str, res: SessionResult, handoff: Path) -> str | None:
         """Why the Ticket is not done; None when it is. The Factory's own checks outrank what the Session says."""
@@ -279,6 +309,7 @@ class Factory:
             self.git("commit", "-q", "--no-verify", "-m", f"factory: unfinished work of Blocked Ticket {t.num}")
         if on_branch:
             self.git("switch", "-q", base)
+        self.log_loose_ends(t, branch, self.state / "handoffs" / f"{t.file_key}.md")
         d = self.state / "blocked"
         d.mkdir(parents=True, exist_ok=True)
         (d / f"{t.file_key}.md").write_text(
