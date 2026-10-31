@@ -31,6 +31,7 @@ def scenario(src: Path) -> None:
     import json
 
     import test_run_e2e as t
+
     from factory.config import Config
     from factory.run import Factory
 
