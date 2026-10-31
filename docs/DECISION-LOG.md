@@ -131,3 +131,11 @@ it as the base. Ticket 04 was stacked on it, and `gh pr create` then failed with
 origin never had that branch. The base is now the newest unblocked Ticket branch (else `base_branch`), and the Run
 switches to it, so the checked-out branch no longer matters. `publish` also pushes the base first when origin lacks it.
 Both are tested with a real git origin (see LESSONS.md).
+
+## 2026-10-31 A Run starts by resolving the [high] items its predecessor left
+
+Reason: the Owner's requirement, from the Instagram project: ticket 03 left a `[high]` Turnstile item and the Run that
+wrote it stopped (or was interrupted) before the resolver ran. The first Run now takes the Handoff of the Ticket the
+stack ends on as `previous`. A `[high]` item with no `.factory/resolutions/<ticket>.md` is resolved first; an existing
+resolution is passed on to the next Ticket. `--dry-run` spends nothing, so it never starts the resolver. If the resolver
+fails, the Run stops, as it does mid-Run.

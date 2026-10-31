@@ -245,6 +245,22 @@ def test_run_stops_when_the_resolver_fails(project: Path, monkeypatch: pytest.Mo
     assert "auth bypass" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
 
 
+def test_next_run_resolves_the_previous_tickets_high_item_first(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_HIGH", "01")
+    monkeypatch.setenv("FAKE_RESOLVE_FAIL", "1")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project, max_tickets=1).run() == 1  # 01 is published, its [high] item is still open
+    monkeypatch.delenv("FAKE_RESOLVE_FAIL")
+    assert factory(project).run() == 0
+    calls = [c[c.index("-p") + 1] for c in claude_calls(project)]
+    assert sum("RESOLVE" in p for p in calls) == 2  # the failed one, then the one at the start of the second Run
+    resolution = project / ".factory" / "resolutions" / "01.md"
+    implement_02 = next(p for p in calls if "Ticket 02" in p and "VERDICT" not in p)
+    assert str(resolution) in implement_02 and str(project / ".factory" / "handoffs" / "01.md") in implement_02
+    assert factory(project).run() == 0  # nothing left: a settled [high] item is not resolved again
+    assert sum("RESOLVE" in c[c.index("-p") + 1] for c in claude_calls(project)) == 2
+
+
 def test_loose_ends_of_a_blocked_ticket_are_logged(project: Path) -> None:
     with_tickets(project, {"01": {"slug": "a"}})
     cfg = Config(tickets_dir="t", checks=("false",), implement_skills=(), review_skills=())

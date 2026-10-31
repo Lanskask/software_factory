@@ -155,19 +155,42 @@ class Factory:
             return t
         return None
 
-    def stack_tip(self) -> str:
-        """The branch the next Ticket stacks on: the newest unblocked Factory branch, else `base_branch`. Never the
-        checked-out branch, which may be hand-made.
+    def tip_ticket(self) -> Ticket | None:
+        """The newest unblocked Ticket that has a Factory branch: the tip of the stack.
 
         shortcut: any existing branch of an unblocked Ticket counts as done work; upgrade when Tickets can be
         abandoned half-way without a Blocked marker.
         """
         blocked = self.blocked_keys()
         for t in reversed(self.tracker.status()):
-            branch = t.branch(self.cfg.branch_prefix)
-            if t.file_key not in blocked and self.git("branch", "--list", branch):
-                return branch
-        return self.cfg.base_branch
+            if t.file_key not in blocked and self.git("branch", "--list", t.branch(self.cfg.branch_prefix)):
+                return t
+        return None
+
+    def stack_tip(self) -> str:
+        """The branch the next Ticket stacks on, else `base_branch`. Never the checked-out branch, which may be
+        hand-made."""
+        tip = self.tip_ticket()
+        return tip.branch(self.cfg.branch_prefix) if tip else self.cfg.base_branch
+
+    def carried_over(self, dry_run: bool) -> tuple[Path | None, Path | None] | None:
+        """The Handoff and resolution of the Ticket the stack ends on, from an earlier Run; None if its resolver fails.
+
+        A [high] item without a resolution is resolved first, which is what the end of the previous Run would have
+        done had it not stopped. `--dry-run` spends nothing, so it only passes on a resolution that already exists.
+        """
+        tip = self.tip_ticket()
+        handoff = self.state / "handoffs" / f"{tip.file_key}.md" if tip else None
+        if tip is None or handoff is None or not handoff.exists():
+            return None, None
+        resolution = self.state / "resolutions" / f"{tip.file_key}.md"
+        if resolution.exists():
+            return handoff, resolution
+        if dry_run or not has_high_loose_end(handoff.read_text()):
+            return handoff, None
+        self.say(f"{tip.num}: [high] loose end left by an earlier Run, resolving it first")
+        self.ensure_plugin()  # the resolver gets the same skills as it would at the end of a Run
+        return (handoff, resolved) if (resolved := self.resolve(tip, handoff)) else None
 
     def run(self, *, dry_run: bool = False) -> int:
         problem = self.preflight()
@@ -184,8 +207,11 @@ class Factory:
             self.say(f"switching to {base}, the tip of the stack")
             self.git("switch", "-q", base)
         skipped: set[str] = set()
-        previous: Path | None = None
-        resolution: Path | None = None
+        carried = self.carried_over(dry_run)
+        if carried is None:
+            self.say("[high] loose end, the resolver failed. Stopping: read .factory/LOOSE-ENDS.md")
+            return 1
+        previous, resolution = carried
         done, blocked = 0, 0
         for _ in range(self.cfg.max_tickets):
             ticket = self.next_ticket(skipped)
