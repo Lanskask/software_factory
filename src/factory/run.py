@@ -3,6 +3,7 @@ before the Factory pushes it and opens a draft pull request. Nothing is ever mer
 
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import subprocess
@@ -152,6 +153,11 @@ class Factory:
         if problem:
             self.say(problem)
             return 1
+        try:
+            self.retry_unpublished()
+        except PushError as e:
+            self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
+            return 1
         base = self.git("rev-parse", "--abbrev-ref", "HEAD")
         skipped: set[str] = set()
         previous: Path | None = None
@@ -179,7 +185,7 @@ class Factory:
             try:
                 out = self.ticket(ticket, base, handoff, previous)
             except PushError as e:
-                self.say(f"{ticket.num}: {e}. Stopping: fix the remote or gh, then run again.")
+                self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
                 return 1
             if out.blocked:
                 blocked += 1
@@ -230,7 +236,7 @@ class Factory:
             problem = self.verify(t, base, fx, handoff)
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
-        self.publish(t, base, branch, handoff, review_log)
+        self.publish(t.num, t.slug, base, branch, handoff, review_log)
         loose = handoff.read_text()
         with (self.state / "LOOSE-ENDS.md").open("a") as f:
             f.write(f"\n<!-- {t.num} {t.slug}, branch {branch} -->\n{loose.rstrip()}\n")
@@ -281,21 +287,32 @@ class Factory:
         )
         return Outcome(blocked=reason)
 
-    def publish(self, t: Ticket, base: str, branch: str, handoff: Path, review_log: str) -> None:
+    def retry_unpublished(self) -> None:
+        """A Ticket whose push or pull request failed is done in the tracker, so only this retry ever publishes it."""
+        for f in sorted((self.state / "unpublished").glob("*.json")):
+            a = json.loads(f.read_text())
+            self.publish(a["num"], a["slug"], a["base"], a["branch"], Path(a["handoff"]), a["review_log"])
+
+    def publish(self, num: str, slug: str, base: str, branch: str, handoff: Path, review_log: str) -> None:
+        pending = self.state / "unpublished" / f"{num}-{slug}.json"
+        pending.parent.mkdir(parents=True, exist_ok=True)
+        record = {"num": num, "slug": slug, "base": base, "branch": branch, "handoff": str(handoff)}
+        pending.write_text(json.dumps({**record, "review_log": review_log}))
         push = subprocess.run(
             ["git", "push", "-q", "-u", "origin", branch], cwd=self.project, capture_output=True, text=True
         )
         if push.returncode != 0:
-            raise PushError(f"git push failed: {push.stderr.strip()}")
+            raise PushError(f"{num}: git push failed: {push.stderr.strip()}")
         body = (
-            f"Ticket {t.num} ({t.slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
-            f"## Ticket\n\n{self.tracker.show(t.num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
+            f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
+            f"## Ticket\n\n{self.tracker.show(num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
         )
         pr = subprocess.run(
-            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch, "--title", f"{t.num} {t.slug}",
+            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch, "--title", f"{num} {slug}",
              "--body", body],
             cwd=self.project, capture_output=True, text=True,
         )  # fmt: skip
         if pr.returncode != 0:
-            raise PushError(f"gh pr create failed: {pr.stderr.strip()}")
-        self.say(f"{t.num}: draft pull request {pr.stdout.strip()}")
+            raise PushError(f"{num}: gh pr create failed: {pr.stderr.strip()}")
+        pending.unlink()
+        self.say(f"{num}: draft pull request {pr.stdout.strip()}")
