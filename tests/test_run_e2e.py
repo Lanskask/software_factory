@@ -44,6 +44,10 @@ def result(text, subtype="success"):
     print(json.dumps({"type": "result", "subtype": subtype, "result": text, "total_cost_usd": 0.5}))
     sys.exit(0)
 num = re.search(r"Ticket (\S+) ", prompt).group(1)
+if "RESOLVE" in prompt:
+    if os.environ.get("FAKE_RESOLVE_FAIL"):
+        result("", subtype="error_max_turns")
+    result("Decision: drop the auth bypass.\nNOW: delete the bypass branch, with a test.")
 if "VERDICT" in prompt:
     fails = os.environ.get("FAKE_REVIEW_FAIL", "")
     marker = f".review-{num}"
@@ -211,11 +215,41 @@ def test_review_fail_gets_one_fix_session_then_passes(project: Path, monkeypatch
     assert any("missing test for the empty case" in p for p in prompts)
 
 
-def test_high_loose_end_stops_the_run_after_its_pr(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_high_loose_end_is_resolved_by_opus_and_the_run_continues(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("FAKE_HIGH", "01")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 0
+    assert len(gh_calls(project)) == 2  # ticket 02 ran after the [high] item of 01
+    calls = claude_calls(project)
+    (resolve,) = [c for c in calls if "RESOLVE" in c[c.index("-p") + 1]]
+    assert resolve[resolve.index("--model") + 1] == "opus"
+    assert resolve[resolve.index("--name") + 1] == "factory proj 01 resolve 1"
+    allowed = resolve[resolve.index("--allowedTools") + 1 : resolve.index("--disallowedTools")]
+    assert "WebSearch" in allowed and "Edit" not in allowed and "Write" not in allowed
+    resolution = project / ".factory" / "resolutions" / "01.md"
+    assert "delete the bypass branch" in resolution.read_text()
+    implement_02 = next(c[c.index("-p") + 1] for c in calls if "Ticket 02" in c[c.index("-p") + 1])
+    assert str(resolution) in implement_02
+    loose = (project / ".factory" / "LOOSE-ENDS.md").read_text()
+    assert "auth bypass" in loose and "delete the bypass branch" in loose
+
+
+def test_run_stops_when_the_resolver_fails(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_HIGH", "01")
+    monkeypatch.setenv("FAKE_RESOLVE_FAIL", "1")
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
     assert factory(project).run() == 1
     assert len(gh_calls(project)) == 1
+    assert "auth bypass" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
+
+
+def test_loose_ends_of_a_blocked_ticket_are_logged(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    cfg = Config(tickets_dir="t", checks=("false",), implement_skills=(), review_skills=())
+    assert Factory(project, cfg, python=sys.executable).run() == 1
+    assert "[low] typo" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
 
 
 def test_blocked_claim_on_a_verified_ticket_becomes_a_high_loose_end(
@@ -223,8 +257,8 @@ def test_blocked_claim_on_a_verified_ticket_becomes_a_high_loose_end(
 ) -> None:
     monkeypatch.setenv("FAKE_BLOCKED_DONE", "01")
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
-    assert factory(project).run() == 1  # stops for the Owner after the pull request
-    assert len(gh_calls(project)) == 1
+    assert factory(project).run() == 0  # the resolver decides, the Run goes on
+    assert len(gh_calls(project)) == 2
     assert "[high]" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
     assert "uvx ty" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
     assert not (project / ".factory" / "blocked").exists()

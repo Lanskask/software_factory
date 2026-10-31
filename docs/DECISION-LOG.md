@@ -114,3 +114,12 @@ Other dirt (tool state like `.serena/cache`) is still the Owner's call: `factory
 
 Reason: the Owner's requirement. Names are `factory <project> <ticket> <kind> <n>`, `factory <project> plan` and
 `factory <project> plan-bootstrap`, so the sessions are easy to find in the session list.
+
+## 2026-10-30 A [high] loose end is resolved by an Opus Session instead of stopping the Run
+
+Reason: the Owner's requirement, from the first real Run: a `[high]` item stopped the Run mid-way, with Tickets left and
+nobody there to read it. The Factory now starts a read-only Session on `resolve_model` (default `opus`) that checks the
+code and the official docs and writes a decision per item (Decision, Steps, When: NOW, LATER or OWNER). The next
+Ticket's goal points at it, and steps marked NOW are done first, in their own commits. Read-only because the fix then
+goes through the next Ticket's checks and review instead of landing unreviewed. If the resolver fails, the Run still
+stops, as before. Every Handoff is logged to `LOOSE-ENDS.md` before the push, and also for Blocked Tickets.

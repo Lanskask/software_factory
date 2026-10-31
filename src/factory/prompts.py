@@ -74,8 +74,20 @@ def _checks(checks: tuple[str, ...]) -> str:
 
 
 # The /goal judge reads the condition literally: name exact commands, never "the checks in your instructions".
-def goal(ticket: Ticket, tk: str, handoff: Path, previous: Path | None, checks: tuple[str, ...]) -> str:
+def goal(
+    ticket: Ticket,
+    tk: str,
+    handoff: Path,
+    previous: Path | None,
+    checks: tuple[str, ...],
+    resolution: Path | None = None,
+) -> str:
     before = f" Read {previous} first: the previous Ticket's Handoff, for context only." if previous else ""
+    if resolution:
+        before += (
+            f" Then read {resolution}: the decision on that Handoff's [high] loose ends. Do the steps it marks NOW"
+            f" first, each in its own commit with a test; they are in scope of this Ticket."
+        )
     return (
         f"/goal Ticket {ticket.num} ({ticket.slug}) is done: `{tk} status` shows it done, {_checks(checks)} each "
         f"exit 0 with output shown, `git status` is clean, and you wrote the Handoff to {handoff} . Or your last "
@@ -90,6 +102,23 @@ def fix_goal(ticket: Ticket, tk: str, handoff: Path, findings: str, checks: tupl
         f"up to date (Tickets: `{tk} status`). Or your last message ends with a line BLOCKED: <reason>.\n\n"
         f"Review findings:\n{findings}"
     )
+
+
+def resolve_prompt(ticket: Ticket, tk: str, handoff: Path) -> str:
+    return f"""RESOLVE. Ticket {ticket.num} ({ticket.slug}) is done and its pull request is open, but its
+Handoff {handoff} holds [high] loose ends. The unattended Run does not stop for them: you decide, and the next
+Ticket's Session acts on your answer. You cannot edit files.
+
+Read the Handoff and the Ticket (`{tk} show {ticket.num}`), then the code each [high] item names. Check facts in the
+code and, where a library or service decides it, in its official documentation (WebSearch, WebFetch) before you decide.
+
+For each [high] item answer in this form:
+- Item: <the item, one line>
+- Decision: <valid or not, and what to do, one line>
+- Steps: <the smallest correct change: files, what changes, the test that proves it>
+- When: NOW if the next Ticket's Session must do it first (data loss, security, wrong results, broken build);
+  LATER if it can wait; OWNER if only a human can do it (credentials, money, a product choice).
+Mark each NOW step with a line starting `NOW:`. End with what you did not verify."""
 
 
 def review_prompt(ticket: Ticket, base: str, tk: str, handoff: Path, cfg: Config) -> str:
