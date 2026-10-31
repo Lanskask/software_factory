@@ -25,9 +25,10 @@ def session_command(
     model: str | None,
     plugin_dir: str | None,
     permission_mode: str,
+    name: str,
     claude: str = "claude",
 ) -> list[str]:
-    cmd = [claude, "-p", prompt, "--permission-mode", permission_mode]
+    cmd = [claude, "-p", prompt, "--permission-mode", permission_mode, "--name", name]
     if system:
         cmd += ["--append-system-prompt", system]
     if allowed:

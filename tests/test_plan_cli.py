@@ -15,6 +15,9 @@ from factory.run import Factory
 CLAUDE_LOG = r"""
 import json, os, sys
 with open(os.environ["FAKE_LOG"], "a") as f: f.write(json.dumps(sys.argv[1:]) + "\n")
+if "/egm:egm-bootstrap" in sys.argv:  # what egm-bootstrap leaves behind: one doc per directory
+    os.makedirs("src", exist_ok=True)
+    for d in (".", "src"): open(os.path.join(d, "EGM_DOC.md"), "w").write("# Blueprint\n")
 print(json.dumps({"type": "result", "subtype": "success", "result": "ok", "total_cost_usd": 0.1}))
 """
 
@@ -73,6 +76,29 @@ def test_plan_bootstraps_unattended_then_opens_an_interactive_session(
     assert boot[:2] == ["-p", "/egm:egm-bootstrap"] and "--max-budget-usd" in boot
     assert "-p" not in interactive and "--append-system-prompt" in interactive
     assert "factory:grill-with-docs" in interactive[interactive.index("--append-system-prompt") + 1]
+    assert boot[boot.index("--name") + 1] == "factory p plan-bootstrap"
+    assert interactive[interactive.index("--name") + 1] == "factory p plan"
+
+
+def test_plan_commits_the_egm_docs_the_bootstrap_wrote(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    exe = fake_claude(tmp_path, monkeypatch)
+    proj = tmp_path / "p"
+    proj.mkdir()
+    for args in (("init", "-q", "-b", "main"), ("config", "user.email", "t@t"), ("config", "user.name", "t")):
+        subprocess.run(["git", *args], cwd=proj, check=True)
+    (proj / "notes.txt").write_text("the owner's own work\n")
+    cfg = Config(tickets_dir="t", checks=("true",))
+    Planner(proj, cfg, claude=str(exe), python=sys.executable, skills=()).plan(None, bootstrap=True)
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=proj, check=True, capture_output=True, text=True).stdout.strip()
+
+    assert git("log", "-1", "--format=%s") == "factory: EGM_DOC.md files from /egm-bootstrap"
+    assert git("show", "--name-only", "--format=", "HEAD").splitlines() == [
+        "EGM_DOC.md",
+        "src/EGM_DOC.md",
+    ]
+    assert "EGM_DOC" not in git("status", "--porcelain")
 
 
 def test_plan_without_bootstrap_puts_it_back_into_the_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

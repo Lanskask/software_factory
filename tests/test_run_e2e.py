@@ -153,6 +153,13 @@ def test_run_stacks_branches_pushes_and_opens_draft_prs(project: Path) -> None:
     sessions = claude_calls(project)
     assert len(sessions) == 4  # implement + review per ticket
     assert all("Bash(git push*)" in c for c in sessions)
+    names = [c[c.index("--name") + 1] for c in sessions]
+    assert names == [
+        "factory proj 01 implement 1",
+        "factory proj 01 review 1",
+        "factory proj 02 implement 1",
+        "factory proj 02 review 1",
+    ]
 
 
 def test_blocked_ticket_is_recorded_its_dependent_skipped_and_the_rest_run(
@@ -212,11 +219,12 @@ def test_ticket_mentioning_cloud_tools_is_skipped(project: Path) -> None:
     assert len(gh_calls(project)) == 1
 
 
-def test_dirty_tree_refuses_to_start(project: Path) -> None:
+def test_dirty_tree_refuses_to_start_and_names_the_files(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with_tickets(project, {"01": {"slug": "a"}})
     (project / "stray.txt").write_text("x")
     assert factory(project).run() == 1
     assert claude_calls(project) == []
+    assert "?? stray.txt" in capsys.readouterr().out
 
 
 def test_dry_run_spends_nothing(project: Path, capsys: pytest.CaptureFixture[str]) -> None:

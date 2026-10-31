@@ -96,7 +96,7 @@ class Factory:
         own = ("Skill", "Agent", "Read", "Glob", "Grep", *GIT_READ)
         return (*own, f"Bash({tk} show*)", f"Bash({tk} status*)", *checks)
 
-    def command(self, prompt: str, *, review: bool) -> list[str]:
+    def command(self, prompt: str, *, review: bool, name: str) -> list[str]:
         return session_command(
             prompt,
             system=session_rules(self.cfg, self.tracker.command),
@@ -106,6 +106,7 @@ class Factory:
             model=self.cfg.model,
             plugin_dir=self.plugin_dir,
             permission_mode="default" if review else "acceptEdits",
+            name=name,
             claude=self.claude,
         )
 
@@ -113,7 +114,8 @@ class Factory:
         n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
         log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
         self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
-        res = run_session(self.command(prompt, review=review), self.project, log, self.cfg.timeout_minutes * 60)
+        cmd = self.command(prompt, review=review, name=f"factory {self.project.name} {ticket.num} {kind} {n}")
+        res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
         self.cost += res.cost_usd
         self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
         return res
@@ -121,8 +123,11 @@ class Factory:
     # --- the Run -------------------------------------------------------------------------------------------------
 
     def preflight(self) -> str | None:
-        if self.git("status", "--porcelain"):
-            return "the working tree is not clean: commit or stash first"
+        if dirty := self.git("status", "--porcelain"):
+            return (
+                "the working tree is not clean. Commit what belongs to the Project (docs, config), git-ignore local "
+                "tool state (caches, live sessions), then run again:\n" + dirty
+            )
         ignored = subprocess.run(["git", "check-ignore", "-q", ".factory/handoffs/x.md"], cwd=self.project)
         if ignored.returncode != 0:
             return "`.factory/` is not git-ignored: run `factory init` or add `.factory/*` and `!.factory/config.toml`"
@@ -163,7 +168,9 @@ class Factory:
                 print(
                     shlex.join(
                         self.command(
-                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks), review=False
+                            goal(ticket, self.tracker.command, handoff, previous, self.cfg.checks),
+                            review=False,
+                            name=f"factory {self.project.name} {ticket.num} implement 1",
                         )
                     )
                 )

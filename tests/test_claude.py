@@ -15,8 +15,10 @@ def test_session_command_has_budget_tools_and_no_persistence() -> None:
         model=None,
         plugin_dir=None,
         permission_mode="acceptEdits",
+        name="factory p 01 implement 1",
     )
     assert cmd[:3] == ["claude", "-p", "/goal x"]
+    assert cmd[cmd.index("--name") + 1] == "factory p 01 implement 1"
     assert cmd[cmd.index("--max-budget-usd") + 1] == "5.0"
     assert "Bash(make test)" in cmd and "Bash(git push*)" in cmd
     assert "--plugin-dir" not in cmd and "--model" not in cmd
@@ -35,6 +37,7 @@ def test_session_command_adds_plugin_dir_and_model_when_given(tmp_path: object) 
         model="opus",
         plugin_dir="/x",
         permission_mode="default",
+        name="n",
     )
     assert cmd[cmd.index("--plugin-dir") + 1] == "/x"
     assert cmd[cmd.index("--model") + 1] == "opus"
