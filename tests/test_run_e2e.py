@@ -285,6 +285,29 @@ def test_dry_run_spends_nothing(project: Path, capsys: pytest.CaptureFixture[str
     assert claude_calls(project) == [] and "/goal" in capsys.readouterr().out
 
 
+def test_next_run_stacks_on_the_factory_branches_not_on_the_checked_out_branch(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project, max_tickets=1).run() == 0
+    git(project, "switch", "-q", "-c", "scratch", "main")
+    (project / "hand.txt").write_text("a hand-made branch the Run must ignore")
+    git(project, "add", "hand.txt")
+    git(project, "commit", "-qm", "hand-made")
+    assert factory(project).run() == 0
+    assert git(project, "merge-base", "--is-ancestor", "factory/01-a", "factory/02-b") == ""
+    assert (
+        subprocess.run(["git", "merge-base", "--is-ancestor", "scratch", "factory/02-b"], cwd=project).returncode == 1
+    )
+    assert gh_calls(project)[-1][gh_calls(project)[-1].index("--base") + 1] == "factory/01-a"
+
+
+def test_publish_pushes_a_base_branch_that_is_missing_on_origin(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project, max_tickets=1).run() == 0
+    git(project, "push", "-q", "origin", "--delete", "factory/01-a")
+    assert factory(project).run() == 0
+    assert "refs/heads/factory/01-a" in git(project, "ls-remote", "--heads", "origin")
+
+
 def test_real_run_prints_the_dry_run_preview_before_the_first_session(
     project: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

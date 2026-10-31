@@ -123,3 +123,11 @@ code and the official docs and writes a decision per item (Decision, Steps, When
 Ticket's goal points at it, and steps marked NOW are done first, in their own commits. Read-only because the fix then
 goes through the next Ticket's checks and review instead of landing unreviewed. If the resolver fails, the Run still
 stops, as before. Every Handoff is logged to `LOOSE-ENDS.md` before the push, and also for Blocked Tickets.
+
+## 2026-10-31 The next Ticket stacks on the newest Factory branch, and publish pushes a missing base
+
+Reason: measured failure in a real Run. A hand-made branch was checked out when `factory run` started, so the Run took
+it as the base. Ticket 04 was stacked on it, and `gh pr create` then failed with "Base ref must be a branch" because
+origin never had that branch. The base is now the newest unblocked Ticket branch (else `base_branch`), and the Run
+switches to it, so the checked-out branch no longer matters. `publish` also pushes the base first when origin lacks it.
+Both are tested with a real git origin (see LESSONS.md).

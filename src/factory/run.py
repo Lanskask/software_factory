@@ -155,6 +155,20 @@ class Factory:
             return t
         return None
 
+    def stack_tip(self) -> str:
+        """The branch the next Ticket stacks on: the newest unblocked Factory branch, else `base_branch`. Never the
+        checked-out branch, which may be hand-made.
+
+        shortcut: any existing branch of an unblocked Ticket counts as done work; upgrade when Tickets can be
+        abandoned half-way without a Blocked marker.
+        """
+        blocked = self.blocked_keys()
+        for t in reversed(self.tracker.status()):
+            branch = t.branch(self.cfg.branch_prefix)
+            if t.file_key not in blocked and self.git("branch", "--list", branch):
+                return branch
+        return self.cfg.base_branch
+
     def run(self, *, dry_run: bool = False) -> int:
         problem = self.preflight()
         if problem:
@@ -165,7 +179,10 @@ class Factory:
         except PushError as e:
             self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
             return 1
-        base = self.git("rev-parse", "--abbrev-ref", "HEAD")
+        base = self.stack_tip()
+        if base != self.git("rev-parse", "--abbrev-ref", "HEAD"):
+            self.say(f"switching to {base}, the tip of the stack")
+            self.git("switch", "-q", base)
         skipped: set[str] = set()
         previous: Path | None = None
         resolution: Path | None = None
@@ -329,11 +346,14 @@ class Factory:
         pending.parent.mkdir(parents=True, exist_ok=True)
         record = {"num": num, "slug": slug, "base": base, "branch": branch, "handoff": str(handoff)}
         pending.write_text(json.dumps({**record, "review_log": review_log}))
-        push = subprocess.run(
-            ["git", "push", "-q", "-u", "origin", branch], cwd=self.project, capture_output=True, text=True
-        )
-        if push.returncode != 0:
-            raise PushError(f"{num}: git push failed: {push.stderr.strip()}")
+        # `gh pr create` answers "Base ref must be a branch" for a base that origin does not have.
+        on_origin = self.git("ls-remote", "--heads", "origin", base)
+        for b in (branch,) if on_origin else (base, branch):
+            push = subprocess.run(
+                ["git", "push", "-q", "-u", "origin", b], cwd=self.project, capture_output=True, text=True
+            )
+            if push.returncode != 0:
+                raise PushError(f"{num}: git push of {b} failed: {push.stderr.strip()}")
         body = (
             f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
             f"## Ticket\n\n{self.tracker.show(num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
