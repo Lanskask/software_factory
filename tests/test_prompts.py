@@ -5,6 +5,7 @@ from pathlib import Path
 from factory.config import Config
 from factory.prompts import (
     blocked_reason,
+    fix_goal,
     goal,
     has_high_loose_end,
     parse_verdict,
@@ -29,6 +30,14 @@ def test_goal_names_the_exact_status_command_and_checks() -> None:
     g = goal(T, "python3 -I t/tickets.py --dir t", Path("/h/now.md"), None, CFG.checks)
     assert "`python3 -I t/tickets.py --dir t status`" in g
     assert "`make test`, `make lint`" in g and "instructions" not in g
+
+
+def test_goals_bound_the_turns() -> None:
+    # code.claude.com/docs/en/goal: a turn clause in the condition is the only turn limit /goal has; the Session
+    # budget and timeout alone let a looping Session burn all of them.
+    g = goal(T, "tk", Path("/h/now.md"), None, CFG.checks)
+    f = fix_goal(T, "tk", Path("/h/now.md"), "- finding", CFG.checks)
+    assert "stop after 60 turns" in g and "stop after 60 turns" in f
 
 
 def test_goal_points_at_the_previous_handoff_when_there_is_one() -> None:

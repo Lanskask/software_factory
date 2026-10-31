@@ -123,3 +123,10 @@ code and the official docs and writes a decision per item (Decision, Steps, When
 Ticket's goal points at it, and steps marked NOW are done first, in their own commits. Read-only because the fix then
 goes through the next Ticket's checks and review instead of landing unreviewed. If the resolver fails, the Run still
 stops, as before. Every Handoff is logged to `LOOSE-ENDS.md` before the push, and also for Blocked Tickets.
+
+## 2026-10-31 Every goal carries "Or stop after 60 turns"
+
+Reason: documented behavior. `/goal` has no turn limit of its own; the docs say to put a turn or time clause in the
+condition. The $ budget and the 90-minute timeout stay as the hard stops; the clause ends a looping Session earlier, and
+the Factory's own checks then decide whether the Ticket is done or Blocked. 60 is a guess, not measured: tune it after a
+few real Runs (the stream-json logs in `.factory/logs/` show the turn counts).
