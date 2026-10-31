@@ -139,3 +139,12 @@ wrote it stopped (or was interrupted) before the resolver ran. The first Run now
 stack ends on as `previous`. A `[high]` item with no `.factory/resolutions/<ticket>.md` is resolved first; an existing
 resolution is passed on to the next Ticket. `--dry-run` spends nothing, so it never starts the resolver. If the resolver
 fails, the Run stops, as it does mid-Run.
+
+## PR title is `type: [NN] Ticket title`, code in the body is backticked (2026-10-31)
+
+- Title: `feat: [08] Page changes for Hosted mode`, taken from the Ticket's `# NN: title` heading. The type is the
+  Ticket's optional `**Type:**` line (`test`, `docs`, ...), default `feat`. Reason: the Owner's requirement (Conventional
+  Commits style).
+- Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
+  Sessions write them bare. A heuristic, not a parser: commands such as `make test` are not wrapped.
+- The PR stays a draft: the Factory never marks one ready for review (see the README on review).

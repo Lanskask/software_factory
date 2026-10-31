@@ -12,6 +12,7 @@ from pathlib import Path
 
 from factory.claude import SessionResult, run_session, session_command
 from factory.config import Config
+from factory.pr_text import code_quote, pr_title
 from factory.prompts import (
     blocked_reason,
     fix_goal,
@@ -393,13 +394,14 @@ class Factory:
             )
             if push.returncode != 0:
                 raise PushError(f"{num}: git push of {b} failed: {push.stderr.strip()}")
-        body = (
+        ticket = self.tracker.show(num)
+        body = code_quote(
             f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
-            f"## Ticket\n\n{self.tracker.show(num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
+            f"## Ticket\n\n{ticket}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
         )
         pr = subprocess.run(
-            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch, "--title", f"{num} {slug}",
-             "--body", body],
+            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch,
+             "--title", pr_title(ticket, num, slug), "--body", body],
             cwd=self.project, capture_output=True, text=True,
         )  # fmt: skip
         if pr.returncode != 0:

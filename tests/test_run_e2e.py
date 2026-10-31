@@ -156,6 +156,7 @@ def test_run_stacks_branches_pushes_and_opens_draft_prs(project: Path) -> None:
     assert prs[0][prs[0].index("--base") + 1] == "main"
     assert prs[1][prs[1].index("--base") + 1] == "factory/01-a"
     assert all("merge" not in " ".join(c) for c in prs)
+    assert [c[c.index("--title") + 1] for c in prs] == ["feat: [01] a", "feat: [02] b"]
     assert "[low] typo" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
     sessions = claude_calls(project)
     assert len(sessions) == 4  # implement + review per ticket
