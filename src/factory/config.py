@@ -92,15 +92,21 @@ def template(project: Path) -> str:
     """A starting config.toml: checks from the Makefile targets that exist, tickets where /to-tickets puts them."""
     makefile = project / "Makefile"
     targets = re.findall(r"^([A-Za-z][\w-]*):", makefile.read_text(), re.M) if makefile.exists() else []
-    checks = [f"make {t}" for t in ("test", "lint", "e2e") if t in targets] or ["make test"]
+    # only these names: a target like web-dev starts a server that never exits
+    names = ("test", "lint", "e2e", "web-test", "web-lint", "web-e2e")
+    checks = [f"make {t}" for t in names if t in targets] or ["make test"]
     quoted = ", ".join(f'"{c}"' for c in checks)
+    found = sorted((project / ".scratch").glob("**/tickets.py"))
+    tickets_dir = found[0].parent.relative_to(project).as_posix() if found else f".scratch/{project.name}/tickets"
+    bun = (project / "web" / "package.json").exists()
+    allowed = 'allowed_tools = ["Bash(bun *)"]' if bun else '# allowed_tools = ["Bash(bun run test*)"]'
     return f'''# Software Factory settings for this Project. Every key but the first two is optional.
-tickets_dir = ".scratch/{project.name}/tickets"  # where /to-tickets writes tickets.py and NN-*.md
+tickets_dir = "{tickets_dir}"  # where /to-tickets writes tickets.py and NN-*.md
 checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 
 # base_branch = "main"
 # branch_prefix = "factory/"
-# allowed_tools = ["Bash(bun run test*)"]  # extra tools a Session may use without asking
+{allowed}  # extra tools a Session may use without asking
 # skip_pattern = "{DEFAULT_SKIP}"
 # model = "opus"
 # resolve_model = "opus"     # the read-only Session that decides on a [high] loose end

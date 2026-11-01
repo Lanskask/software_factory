@@ -55,3 +55,27 @@ def test_template_uses_makefile_targets_that_exist(tmp_path: Path) -> None:
 def test_config_defaults_are_a_valid_config() -> None:
     cfg = Config(tickets_dir="t", checks=("make test",))
     assert cfg.implement_skills and cfg.review_skills
+
+
+def test_template_finds_the_existing_tickets_folder_under_scratch(tmp_path: Path) -> None:
+    (tmp_path / ".scratch" / "task-tracker" / "issues").mkdir(parents=True)
+    (tmp_path / ".scratch" / "task-tracker" / "issues" / "tickets.py").write_text("")
+    (tmp_path / ".scratch" / "other").mkdir()  # no tickets.py: ignored
+    write(tmp_path, template(tmp_path))
+    assert load_config(tmp_path).tickets_dir == ".scratch/task-tracker/issues"
+
+
+def test_template_adds_web_checks_and_bun_when_the_project_has_a_web_app(tmp_path: Path) -> None:
+    makefile = "test:\n\tgo test\nweb-dev:\n\tbun dev\nweb-test:\n\tbun test\nweb-e2e:\n\tbun e2e\n"
+    (tmp_path / "Makefile").write_text(makefile)
+    (tmp_path / "web").mkdir()
+    (tmp_path / "web" / "package.json").write_text("{}")
+    write(tmp_path, template(tmp_path))
+    cfg = load_config(tmp_path)
+    assert cfg.checks == ("make test", "make web-test", "make web-e2e")  # web-dev never exits: not a check
+    assert cfg.allowed_tools == ("Bash(bun *)",)
+
+
+def test_template_leaves_allowed_tools_empty_without_a_web_app(tmp_path: Path) -> None:
+    write(tmp_path, template(tmp_path))
+    assert load_config(tmp_path).allowed_tools == ()
