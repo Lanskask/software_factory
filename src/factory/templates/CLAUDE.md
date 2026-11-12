@@ -19,7 +19,12 @@ paste it again. The owner's standing answers are in `docs/OWNER-ANSWERS.md`: do 
 - Never state a fact from memory that you could check: read the code, run the command, or open the docs.
 - Name things with their meaning: a ticket by number and title, a board by what it shows, never a bare code.
 - In Markdown, everything that is code goes in backticks: paths, commands, flags, functions.
-- Never touch the paths listed under `protected` in `.factory/config.toml`, if it has any.
+- Never touch anything listed under "Protected" below.
+
+## Protected
+
+Shared data no session may write, wipe or migrate (for example a dev database other people use). Empty until the
+owner fills it in.
 
 ## End
 
