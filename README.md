@@ -1,7 +1,8 @@
 # Software Factory
 
 Point it at a git Project. You plan with Claude once (Spec and Tickets); then the Factory implements every Ticket
-unattended, one fresh Claude Code session each, and opens a stacked draft pull request per Ticket. It never merges.
+unattended, one fresh Claude Code session each, and opens a stacked draft pull request per Ticket. It never merges,
+unless `merge = "green"` in `.factory/config.toml` turns on GitHub auto-merge for the bottom pull request of the stack.
 Terms are defined in [GLOSSARY.md](GLOSSARY.md), decisions and their reasons in
 [docs/DECISION-LOG.md](docs/DECISION-LOG.md).
 
