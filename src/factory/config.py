@@ -24,6 +24,7 @@ class Config:
     base_branch: str = "main"
     branch_prefix: str = "factory/"
     allowed_tools: tuple[str, ...] = ()  # extra --allowedTools entries for implementation Sessions
+    protected: tuple[str, ...] = ()  # paths no Session may edit or write (shared data); also listed in the rules
     skip_pattern: str = DEFAULT_SKIP
     model: str | None = None
     resolve_model: str = "opus"  # decides what to do about a [high] loose end, so the Run does not stop
@@ -107,6 +108,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # base_branch = "main"
 # branch_prefix = "factory/"
 {allowed}  # extra tools a Session may use without asking
+# protected = ["data/shared.db"]  # Sessions may not Edit or Write these paths
 # skip_pattern = "{DEFAULT_SKIP}"
 # model = "opus"
 # resolve_model = "opus"     # the read-only Session that decides on a [high] loose end
