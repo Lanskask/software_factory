@@ -191,3 +191,16 @@ fails, the Run stops, as it does mid-Run.
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
   Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
 - The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
+
+## The eval scores a Run from its files, hidden tests come in only afterwards (2026-11-12)
+
+- The scorer (`factory.score`) reads only the run directory: Ticket states, `.factory/blocked/`, the result events of
+  `.factory/logs/*.jsonl` (cost, `duration_ms`, review verdicts) and the config's checks. Reason: the Factory already
+  writes all of it, so scoring needs no new hooks in the Run.
+- Hidden tests are copied in after the Run, run with the scorer's own pytest (the fixture is stdlib-only) and removed
+  again. `hidden_total` comes from `expected.json`, so a run whose code does not even import scores 0 of 15, not 0 of 1.
+- Review agreement: the trap Ticket should end FAIL or Blocked, every other reviewed Ticket PASS; Tickets the Run never
+  reached are not judged.
+- Interventions cannot be seen in the logs, so the Owner writes one `- ` line per intervention into
+  `.factory/interventions.md`. Reason: an honest count beats a guessed one.
+- `evals/new_run.sh` gives each run a local bare `origin` and a `gh` stand-in, so the Run publishes without GitHub.

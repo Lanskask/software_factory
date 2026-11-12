@@ -80,3 +80,22 @@ make test       # fake claude and gh, real git: no money, no network
 make lint       # ruff and ty
 make probe      # re-run the paid print-mode probe (about $0.03)
 ```
+
+## Eval
+
+`evals/slugify-cli/` is a small fixture Project (a spec, 4 Tickets and 1 trap Ticket, `05-keep-case`, that contradicts
+the spec) to score a change to the Factory. The hidden acceptance tests in `evals/hidden/slugify-cli/` stay outside the
+fixture: `make eval-score` copies them into the run directory, runs them and removes them again.
+
+One repeat costs about $0.5 per Ticket, so about $2.5 per repeat. Run 3 repeats on haiku and 3 on sonnet:
+
+```bash
+make eval-new RUN=/tmp/eval-haiku-1 MODEL=haiku   # fixture as a git repo with a local origin and a gh stand-in
+PATH="/tmp/eval-haiku-1.bin:$PATH" factory run /tmp/eval-haiku-1   # paid
+make eval-score RUN=/tmp/eval-haiku-1             # one JSON line
+```
+
+Each time you step in during a Run (restart it, fix something by hand), append a `- what you did` line to
+`RUN/.factory/interventions.md`; the scorer counts those lines. The JSON line holds: `tickets`, `done`, `blocked`,
+`checks_green`, `hidden_passed`/`hidden_total`, `review_agreed`/`review_judged` (the trap should be FAIL or Blocked, the
+rest PASS), `cost_usd`, `minutes`, `sessions`, `fix_sessions` and `interventions`, read from `RUN/.factory/logs/`.

@@ -1,0 +1,8 @@
+# Software Factory settings for the slugify-cli eval fixture. Set `model` per repeat (haiku, sonnet).
+tickets_dir = ".scratch/slugify-cli/tickets"
+checks = ["make test", "make lint"]
+model = "haiku"
+budget_usd = 1.0
+review_budget_usd = 0.5
+timeout_minutes = 20
+max_blocked = 3
