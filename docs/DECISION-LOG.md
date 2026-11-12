@@ -225,3 +225,13 @@ fails, the Run stops, as it does mid-Run.
   would land in that branch, not in `base_branch`.
 - If `gh pr ready` or `gh pr merge` fails (auto-merge disabled in the repo, missing token scope), the Run prints a
   warning and goes on: the PR is already open, so nothing is lost and the publish is not retried.
+
+## [low] loose ends become Backlog ticket lines in `.factory/BACKLOG.md` (2026-11-12)
+
+- At the end of a Run each `[low]` item of the Handoffs in `LOOSE-ENDS.md` becomes one `- [ ] <item> (from NN slug)`
+  line in `.factory/BACKLOG.md`. A plain file write, no Session: docs/factory-analysis.md P3 planned a $0.50 Session,
+  but the Ticket allows a file write and the items need no rewording. Reason: YAGNI, and no cost.
+- Not tickets in the tracker: `tickets.py` has no `new` command, and a `todo` Ticket with no blockers would be picked
+  up by the next unattended Run. The Owner promotes or drops them after reading `factory status`.
+- Only what this Run appended to `LOOSE-ENDS.md` is filed, and a line already in the file is not written again: a line
+  the Owner deletes stays deleted. Items in a resolver's decision are skipped: they are not Handoff items.
