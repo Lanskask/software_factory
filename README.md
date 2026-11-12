@@ -34,6 +34,11 @@ If the Project already has Tickets in the `/to-tickets` format, skip `plan`. `fa
 first folder under `.scratch/` that holds a `tickets.py` (any name, such as `tickets/` or `issues/`), and to
 `.scratch/<project>/tickets` when there is none.
 
+`bootstrap` also writes, only where the Project has none, three files from `src/factory/templates/`: `CLAUDE.md`
+(standing rules for interactive sessions), `.claude/settings.json` (a `SessionStart` hook that prints
+`.factory/handoffs/latest.md`) and `docs/OWNER-ANSWERS.md` (the owner questions with defaults; `plan` asks the
+unanswered ones once).
+
 ## What a Run does per Ticket
 
 1. Branch `factory/<num>-<slug>` from the last Ticket that reached a pull request (or the current branch).

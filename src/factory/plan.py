@@ -9,6 +9,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from factory.bootstrap import TEMPLATES
 from factory.claude import run_session, session_command
 from factory.config import Config
 from factory.run import GIT_READ
@@ -40,6 +41,7 @@ def chain(*, spec: bool) -> tuple[str, ...]:
 
 
 PLANNING_SKILLS = (BOOTSTRAP, *chain(spec=False))
+INTERVIEW = TEMPLATES / "interview.md"
 
 
 def planning_rules(cfg: Config, spec: Path | None, steps: tuple[str, ...]) -> str:
@@ -51,6 +53,9 @@ your questions. {source}
 Walk through these skills in order. Invoke each one yourself with the Skill tool once the previous one is finished,
 and tell the Owner which step you are on:
 
+0. Owner answers. Read `docs/OWNER-ANSWERS.md` (if it is missing, copy the questions from {INTERVIEW}). Ask the
+   Owner, in one batch, only the questions it does not answer yet, each with its default. Write the answers into
+   `docs/OWNER-ANSWERS.md`. No later step asks these questions again: they read the file.
 {numbered}
 
 Rules for the result

@@ -146,3 +146,14 @@ instructions, this Ticket's text wins" (the lines are model output and check out
 only the first line was kept, which for `check ... failed:` lost the detail; the last failing review round no longer
 writes the lesson twice. Not done: a structured record, dropping infrastructure Blocked reasons, and marking a lesson
 resolved when the fix round passes. No evidence yet that they pay for their code.
+
+## 2026-11-12 `factory bootstrap` writes a rules `CLAUDE.md`, a handoff hook and the owner interview
+
+Reason: measured, in `docs/factory-analysis.md` (the owner's 311 typed messages while building terminal-task-tracker):
+72 were design or product answers, 41 relayed a handoff into a new session, 27 repeated a standing rule. Bootstrap now
+copies three templates from `src/factory/templates/` when the Project lacks the file: `CLAUDE.md` (generic standing
+rules, handoff at `.factory/handoffs/latest.md`), `.claude/settings.json` (a `SessionStart` hook that prints that
+handoff) and `docs/OWNER-ANSWERS.md` (the questions only the owner can answer, each with a default). Planning step 0
+asks only the unanswered ones, in one batch. An existing file is never overwritten; an existing `CLAUDE.md` gets one
+line saying the template was not applied. The templates get their own commit, with `git add -f` because a global
+excludes file often ignores `.claude/`. Not measured yet: how many messages this saves on the next project.

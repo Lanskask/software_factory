@@ -25,6 +25,8 @@ def test_bootstrap_output_uses_relative_paths(
     out = capsys.readouterr().out
     assert str(tmp_path) not in out
     assert out.splitlines() == [
+        "✔ wrote CLAUDE.md, .claude/settings.json, docs/OWNER-ANSWERS.md",
+        "✔ committed CLAUDE.md, .claude/settings.json, docs/OWNER-ANSWERS.md",
         "✔ wrote .factory/config.toml  (check `checks` and `tickets_dir`, commit any edit)",
         "✔ added .factory/*, !.factory/config.toml to .gitignore",
         "✔ committed .factory/config.toml, .gitignore",
