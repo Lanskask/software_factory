@@ -55,6 +55,7 @@ How to work
 Scope
 - Finish everything in scope of this Ticket: its tasks, its acceptance criteria, and anything you broke or left half
   done. Nothing in scope may be left for a later Session.
+- Write one test per acceptance criterion: the review FAILs a Ticket whose criterion has no test.
 - The Handoff may only hold problems outside this Ticket's scope and decisions the Owner should revisit. Tag an item
   [high] if it could later cause data loss, a security hole, wrong results or a broken build; otherwise [low].
 - If the Ticket cannot be done correctly without a decision from the Owner, do not guess. Stop and end your last
@@ -145,6 +146,8 @@ def review_prompt(ticket: Ticket, base: str, tk: str, handoff: Path, cfg: Config
 
 Read the Ticket with `{tk} show {ticket.num}`. {how}: Standards are this repo's documented standards, the Spec is the
 Ticket.{extra} Read the Handoff {handoff}: an item there that is actually inside this Ticket's scope is a finding.
+Check that every acceptance criterion has a test that checks it; a criterion without one is a finding and the
+verdict is FAIL.
 
 Report only must-fix findings: bugs, acceptance criteria without a test, security holes, mismatches with the Ticket.
 Not style. Number them, each with file and line. Your last line is exactly `VERDICT: PASS` or `VERDICT: FAIL`."""

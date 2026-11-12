@@ -64,6 +64,8 @@ Rules for the result
 - After Planning, every Ticket is implemented unattended: one Session each, about ${cfg.budget_usd:.0f} and
   {cfg.timeout_minutes} minutes. Keep Tickets small and clear, with acceptance criteria a test can check, and resolve
   every open question now: no Session can ask the Owner.
+- /to-tickets writes every acceptance criterion in EARS form, "When X, the system shall Y", so each one maps to one
+  test.
 - A Ticket that needs the Owner (a go-ahead, cloud resources, money, credentials) says "Owner's go-ahead" in its text,
   so the Run skips it.
 - At the end, commit the Spec, the docs and the Tickets on the current branch, and tell the Owner to run
