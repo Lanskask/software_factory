@@ -33,6 +33,7 @@ class Config:
     max_tickets: int = 10
     max_blocked: int = 2
     review_rounds: int = 2
+    merge: str = "never"  # "green": turn on GitHub auto-merge for the bottom PR of the stack after review PASS
     implement_skills: tuple[str, ...] = (
         "mattpocock-skills:implement",
         "mattpocock-skills:tdd",
@@ -65,6 +66,8 @@ def load_config(project: Path) -> Config:
             raise ConfigError(f"{path}: `{required}` is required")
     if not values["checks"]:
         raise ConfigError(f"{path}: `checks` needs at least one command")
+    if values.get("merge", "never") not in ("never", "green"):
+        raise ConfigError(f'{path}: `merge` must be "never" or "green"')
     try:
         re.compile(str(values.get("skip_pattern", DEFAULT_SKIP)))
     except re.error as e:
@@ -124,6 +127,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # max_tickets = 10           # per Run
 # max_blocked = 2            # Blocked Tickets that stop a Run
 # review_rounds = 2          # reviews per Ticket; each FAIL but the last gets a fix Session
+# merge = "never"            # "green": after review PASS, auto-merge the bottom pull request once CI is green
 # implement_skills = ["mattpocock-skills:implement", "mattpocock-skills:tdd", "mattpocock-skills:diagnosing-bugs"]
 # review_skills = ["mattpocock-skills:code-review", "agent-skills:security-and-hardening"]
 '''

@@ -57,6 +57,20 @@ def test_config_defaults_are_a_valid_config() -> None:
     assert cfg.implement_skills and cfg.review_skills
 
 
+@pytest.mark.parametrize("value", ["never", "green"])
+def test_load_config_accepts_merge_never_and_green(tmp_path: Path, value: str) -> None:
+    write(tmp_path, f'tickets_dir = "t"\nchecks = ["make test"]\nmerge = "{value}"\n')
+    assert load_config(tmp_path).merge == value
+
+
+def test_merge_defaults_to_never_and_rejects_other_values(tmp_path: Path) -> None:
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["make test"]\n')
+    assert load_config(tmp_path).merge == "never"
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["make test"]\nmerge = "always"\n')
+    with pytest.raises(ConfigError, match="merge"):
+        load_config(tmp_path)
+
+
 def test_template_finds_the_existing_tickets_folder_under_scratch(tmp_path: Path) -> None:
     (tmp_path / ".scratch" / "task-tracker" / "issues").mkdir(parents=True)
     (tmp_path / ".scratch" / "task-tracker" / "issues" / "tickets.py").write_text("")
