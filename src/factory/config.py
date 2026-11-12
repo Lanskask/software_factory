@@ -94,7 +94,15 @@ def template(project: Path) -> str:
     targets = re.findall(r"^([A-Za-z][\w-]*):", makefile.read_text(), re.M) if makefile.exists() else []
     # only these names: a target like web-dev starts a server that never exits
     names = ("test", "lint", "e2e", "web-test", "web-lint", "web-e2e")
-    checks = [f"make {t}" for t in names if t in targets] or ["make test"]
+    # checks = CI: the make targets the workflows run, except those that install or ship
+    ci = [
+        t
+        for wf in sorted((project / ".github" / "workflows").glob("*.y*ml"))
+        for t in re.findall(r"^\s*(?:-\s*)?(?:run:\s*\|?\s*)?make\s+([A-Za-z][\w-]*)", wf.read_text(), re.M)
+        if t in targets and not re.search(r"setup|install|deploy|release|publish|smoke", t)
+    ]
+    ordered = dict.fromkeys(ci + [t for t in names if t in targets])
+    checks = [f"make {t}" for t in ordered] or ["make test"]
     quoted = ", ".join(f'"{c}"' for c in checks)
     found = sorted((project / ".scratch").glob("**/tickets.py"))
     tickets_dir = found[0].parent.relative_to(project).as_posix() if found else f".scratch/{project.name}/tickets"

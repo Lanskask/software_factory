@@ -79,3 +79,18 @@ def test_template_adds_web_checks_and_bun_when_the_project_has_a_web_app(tmp_pat
 def test_template_leaves_allowed_tools_empty_without_a_web_app(tmp_path: Path) -> None:
     write(tmp_path, template(tmp_path))
     assert load_config(tmp_path).allowed_tools == ()
+
+
+def test_template_copies_the_make_targets_ci_runs_into_checks(tmp_path: Path) -> None:
+    makefile = "setup:\n\tuv sync\ntest:\n\tpytest\nlint:\n\truff\ntypecheck:\n\tty\ndeploy:\n\tfly deploy\n"
+    (tmp_path / "Makefile").write_text(makefile)
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "jobs:\n  check:\n    steps:\n      - run: make setup\n      - run: make typecheck # make sure types hold\n"
+        "      - run: |\n          make lint\n          make test\n"
+    )
+    (workflows / "deploy.yml").write_text("      - run: make deploy\n")
+    write(tmp_path, template(tmp_path))
+    # setup installs and deploy ships: neither is a check; "make sure" in a comment is not a target
+    assert load_config(tmp_path).checks == ("make typecheck", "make lint", "make test")
