@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from factory.bootstrap import branch_warning, next_step
+from factory.bootstrap import branch_warning, copy_templates, next_step
 from factory.config import ConfigError, config_path, load_config, template
 from factory.plan import Planner
 from factory.run import Factory
@@ -50,15 +50,18 @@ def cmd_init(project: Path) -> int:
     return 0
 
 
-def commit(project: Path, paths: list[str]) -> None:
+def commit(project: Path, paths: list[str], msg: str = "factory: config and .gitignore lines") -> None:
     """Commit the files the Factory wrote, and only those, so that a Run starts from a clean tree."""
-    msg = "factory: config and .gitignore lines"
-    ok = subprocess.run(["git", "add", "--", *paths], cwd=project, capture_output=True).returncode == 0
+    # -f: a global excludes file often ignores `.claude/`, but the Project's own `.claude/settings.json` is shared
+    ok = subprocess.run(["git", "add", "-f", "--", *paths], cwd=project, capture_output=True).returncode == 0
     ok = ok and subprocess.run(["git", "commit", "-q", "-m", msg, "--", *paths], cwd=project).returncode == 0
     print(f"✔ committed {', '.join(paths)}" if ok else f"factory: could not commit {', '.join(paths)}: do it yourself")
 
 
 def cmd_bootstrap(project: Path) -> int:
+    if written := copy_templates(project):
+        print(f"✔ wrote {', '.join(written)}")
+        commit(project, written, "factory: project rules, settings and owner-answers templates")
     cmd_init(project)
     cfg = load_config(project)
     (project / cfg.tickets_dir).mkdir(parents=True, exist_ok=True)

@@ -9,6 +9,28 @@ from factory.config import Config
 from factory.tracker import Tracker
 
 SPEC_GLOBS = ("docs/SPEC.md", "docs/spec.md", "SPEC.md", "spec.md", ".scratch/*/spec.md")
+TEMPLATES = Path(__file__).parent / "templates"
+# Project path -> template file. An existing file is never overwritten.
+PROJECT_FILES = {
+    "CLAUDE.md": "CLAUDE.md",
+    ".claude/settings.json": "settings.json",
+    "docs/OWNER-ANSWERS.md": "interview.md",
+}
+
+
+def copy_templates(project: Path) -> list[str]:
+    """Copy each template the Project lacks; return the Project paths written."""
+    written = []
+    for target, name in PROJECT_FILES.items():
+        dest = project / target
+        if dest.exists():
+            if target == "CLAUDE.md":
+                print(f"factory: CLAUDE.md exists: the rules template was not applied (see {TEMPLATES / name})")
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text((TEMPLATES / name).read_text())
+        written.append(target)
+    return written
 
 
 def find_spec(project: Path) -> Path | None:
