@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from factory.bootstrap import branch_warning, copy_templates, next_step
+from factory.bootstrap import branch_warning, copy_templates, doctor, next_step
 from factory.config import Config, ConfigError, config_path, load_config, template
 from factory.plan import Planner
 from factory.run import Factory
@@ -91,6 +91,7 @@ def cmd_status(project: Path) -> int:
     tickets = tracker.status() if tracker.exists() else []
     done = sum(t.state == "done" for t in tickets)
     print(stage_line(project, cfg))
+    print(doctor(project))
     print(f"Tickets: {done}/{len(tickets)} done")
     for t in tickets:
         print(f"  {t.num}\t{t.state}\t{'READY' if t.ready else ''}\t{t.slug}")
