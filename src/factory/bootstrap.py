@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -40,22 +41,33 @@ def find_spec(project: Path) -> Path | None:
     return None
 
 
+def answered(project: Path) -> bool:
+    """Coarse exit check of `answers`: Q1, the only question with no default, has an Answer."""
+    f = project / "docs" / "OWNER-ANSWERS.md"
+    # The answer may follow `Answer:` on the same line or sit on the lines below, before the next `## ` heading.
+    pattern = r"^## 1\.(?:(?!^## ).)*?^Answer:(?:[ \t]*\S|\s+(?!## )\S)"
+    return f.exists() and re.search(pattern, f.read_text(), re.S | re.M) is not None
+
+
 def next_step(project: Path, cfg: Config) -> tuple[str, str]:
-    """The Project's stage and the command that moves it on."""
+    """The Project's stage (with the Ticket count once there are Tickets) and the command that moves it on."""
     tracker = Tracker(project, cfg.tickets_dir)
-    if tracker.exists():
-        tickets = tracker.status()
+    tickets = tracker.status() if tracker.exists() else []
+    if tickets:
+        done = sum(t.state == "done" for t in tickets)
+        count = f"({done}/{len(tickets)} tickets)"
+        if done == len(tickets):
+            return f"verify {count}", "review the draft PRs"  # shortcut: PR and CI state unknown; no deploy or retro
         if any(t.ready for t in tickets):
-            return "Tickets are ready", f"factory run {project} --dry-run   # then without --dry-run"
-        done = all(t.state == "done" for t in tickets)
-        return (
-            ("All Tickets are done", "review the draft PRs")
-            if done
-            else ("Tickets are blocked", f"factory status {project}")
-        )
+            return f"build {count}", f"factory run {project}"
+        return f"build {count}, blocked", f"factory status {project}"
     if spec := find_spec(project):
-        return f"A Spec exists ({spec}), no Tickets", f"factory plan {project} --spec {spec}"
-    return "No Spec and no Tickets", f"factory plan {project}"
+        return f"tickets (spec {spec})", f"factory plan {project} --spec {spec}"
+    if answered(project):
+        return "spec", f"factory plan {project}"
+    if (project / "docs" / "IDEA.md").exists():
+        return "answers", f"answer docs/OWNER-ANSWERS.md, then factory plan {project}"
+    return "idea", f"write docs/IDEA.md, then factory plan {project}"
 
 
 def branch_warning(project: Path, cfg: Config) -> str | None:

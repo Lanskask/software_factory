@@ -191,3 +191,14 @@ fails, the Run stops, as it does mid-Run.
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
   Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
 - The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
+
+## The stage line is coarse: idea, answers, spec, tickets, build, verify (2026-11-12)
+
+- `next_step()` follows the P9 stage table of `docs/factory-analysis.md` as far as the Factory has data. Idea: no
+  `docs/IDEA.md`. Answers: `IDEA.md` exists but Q1 of `docs/OWNER-ANSWERS.md` has no Answer (the only question without
+  a default; the table asks Q1 to Q7 and Q12). Spec: Q1 answered, no spec file. Tickets: a spec file, no Tickets.
+  Build: Tickets exist and some are not done, shown as `(done/total tickets)`. Verify: every Ticket is done.
+- Left out, because the Factory has no data: design (no UI answer is parsed), the spec's required sections and the
+  `egm-review-loop` result, CI and PR state, review PASS, deploy (`make smoke`) and retro. A finished Project stays at
+  `verify` until the Owner moves on. Reason: YAGNI; the Owner asked for the stage line, not new detectors.
+- `factory status` and `factory bootstrap` print the same line, `Stage: build (34/50 tickets), Next: factory run .`.
