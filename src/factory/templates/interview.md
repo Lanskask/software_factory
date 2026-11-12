@@ -1,7 +1,7 @@
 # Owner answers
 
 The questions only the owner can answer, asked once at the start of Planning. Each has a default: an empty answer means
-the default holds. Later sessions read this file and never ask these questions again.
+the default holds. Later sessions read this file and never ask these questions again. The Planning session also appends each answer to `docs/DECISION-LOG.md`.
 
 ## 1. Idea and first user
 

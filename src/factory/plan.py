@@ -55,7 +55,8 @@ and tell the Owner which step you are on:
 
 0. Owner answers. Read `docs/OWNER-ANSWERS.md` (if it is missing, copy the questions from {INTERVIEW}). Ask the
    Owner, in one batch, only the questions it does not answer yet, each with its default. Write the answers into
-   `docs/OWNER-ANSWERS.md`. No later step asks these questions again: they read the file.
+   `docs/OWNER-ANSWERS.md`, and append each answer to `docs/DECISION-LOG.md` as a dated entry with its reason (the
+   Owner's requirement). No later step asks these questions again: they read the file.
 {numbered}
 
 Rules for the result
