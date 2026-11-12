@@ -100,7 +100,11 @@ class Planner:
             f"/{BOOTSTRAP}",
             system="",
             allowed=BOOTSTRAP_TOOLS,
-            disallowed=("Bash(git push*)", "Bash(git commit*)"),
+            disallowed=(
+                "Bash(git push*)",
+                "Bash(git commit*)",
+                *(f"{tool}({p})" for p in self.cfg.protected for tool in ("Edit", "Write")),
+            ),
             budget_usd=3.0,
             model=self.cfg.model,
             plugin_dir=None,
