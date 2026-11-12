@@ -13,6 +13,7 @@ class SessionResult:
     ok: bool
     text: str  # the final message, or why there is none
     cost_usd: float = 0.0
+    rate_limited: bool = False  # HTTP 429, e.g. the subscription's 5-hour limit: running again later works
 
 
 def session_command(
@@ -60,7 +61,8 @@ def parse_stream(text: str) -> SessionResult:
     if final.get("subtype") != "success" or final.get("is_error"):
         # an API error (e.g. "Credit balance is too low") comes as subtype success with is_error and the message
         why = final.get("result") if final.get("is_error") and final.get("result") else final.get("subtype")
-        return SessionResult(ok=False, text=f"session ended with {why}", cost_usd=cost)
+        limited = final.get("is_error") is True and final.get("api_error_status") == 429
+        return SessionResult(ok=False, text=f"session ended with {why}", cost_usd=cost, rate_limited=limited)
     return SessionResult(ok=True, text=str(final.get("result") or ""), cost_usd=cost)
 
 

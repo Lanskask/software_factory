@@ -7,6 +7,7 @@ import json
 import re
 import shlex
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,6 +73,8 @@ class Factory:
         self.installed = installed
         self.plugin_dir: str | None = None
         self.cost = 0.0
+        self.rate_limit_wait_s = 15 * 60  # between tries of a rate-limited Session
+        self.rate_limit_max_s = 6 * 3600  # the subscription limit resets within 5 hours
 
     # --- small helpers -------------------------------------------------------------------------------------------
 
@@ -119,15 +122,22 @@ class Factory:
     def session(
         self, ticket: Ticket, kind: str, prompt: str, *, review: bool = False, resolve: bool = False
     ) -> SessionResult:
-        n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
-        log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
-        self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
-        name = f"factory {self.project.name} {ticket.num} {kind} {n}"
-        cmd = self.command(prompt, review=review, name=name, resolve=resolve)
-        res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
-        self.cost += res.cost_usd
-        self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
-        return res
+        waited = 0
+        while True:
+            n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
+            log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
+            self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
+            name = f"factory {self.project.name} {ticket.num} {kind} {n}"
+            cmd = self.command(prompt, review=review, name=name, resolve=resolve)
+            res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
+            self.cost += res.cost_usd
+            self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
+            if not res.rate_limited or waited >= self.rate_limit_max_s:
+                return res
+            # a usage limit is not the Ticket's fault: blocking it would cost a rerun of everything done so far
+            self.say(f"{ticket.num}: {res.text}; running it again in {self.rate_limit_wait_s // 60} min")
+            time.sleep(self.rate_limit_wait_s)
+            waited += self.rate_limit_wait_s
 
     # --- the Run -------------------------------------------------------------------------------------------------
 
