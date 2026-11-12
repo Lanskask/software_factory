@@ -59,6 +59,12 @@ def test_planning_rules_start_with_the_owner_answers_interview() -> None:
     assert "docs/OWNER-ANSWERS.md" in step0 and "interview.md" in step0 and "one batch" in step0
 
 
+def test_planning_rules_step0_appends_the_answers_to_the_decision_log() -> None:
+    r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
+    step0 = r[r.index("0. ") : r.index("1. ")]
+    assert "append" in step0 and "docs/DECISION-LOG.md" in step0
+
+
 def test_plan_does_nothing_when_tickets_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     exe = fake_claude(tmp_path, monkeypatch)
     proj = tmp_path / "p"
