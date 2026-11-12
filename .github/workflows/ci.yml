@@ -1,0 +1,25 @@
+name: ci
+
+# A branch with a pull request would run twice (push and pull_request), so push runs only on main, after a merge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: git identity # the tests commit in real temporary repositories
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.com
+      - run: make setup
+      - run: make test # fake `claude` and `gh`, so no secrets
+      - run: make lint
