@@ -173,3 +173,26 @@ def blocked_reason(text: str) -> str | None:
 
 def has_high_loose_end(handoff: str) -> bool:
     return "[high]" in handoff
+
+
+_SOURCE = re.compile(r"<!-- (\S+) (\S+), branch ")  # the header log_loose_ends writes above each Handoff
+
+
+def low_loose_ends(log: str) -> list[str]:
+    """The [low] items of the Handoffs in LOOSE-ENDS.md as Backlog ticket lines, wrapped lines joined."""
+    items: list[list[str]] = []  # [text, source]
+    source = ""
+    in_item = False
+    for line in log.splitlines():
+        if m := _SOURCE.match(line):
+            source, in_item = f"{m[1]} {m[2]}", False
+        elif line.startswith("<!--"):
+            source, in_item = "", False  # a resolver's decision, not a Handoff
+        elif source and line.startswith("- [low] "):
+            items.append([line.removeprefix("- [low] ").strip(), source])
+            in_item = True
+        elif in_item and line.startswith(" ") and line.strip():
+            items[-1][0] += " " + line.strip()
+        else:
+            in_item = False
+    return [f"- [ ] {text} (from {src})" for text, src in items]

@@ -97,6 +97,12 @@ def cmd_status(project: Path) -> int:
     if loose.exists():
         text = loose.read_text()
         print(f"Loose ends: {text.count('- [high]')} high, {text.count('- [low]')} low, in {loose}")
+    backlog = project / ".factory" / "BACKLOG.md"
+    items = [line for line in backlog.read_text().splitlines() if line.startswith("- [ ]")] if backlog.exists() else []
+    if items:
+        print(f"Backlog: {len(items)} [low] loose ends, ticket all or drop, in {backlog}")
+        for item in items:
+            print(f"  {item}")
     return 0
 
 

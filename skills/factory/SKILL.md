@@ -29,5 +29,6 @@ stacked draft PR per Ticket. It never merges. Each Session is separate from this
   show the user the command, and wait for their go-ahead before the real run.
 - Run it in the background and tell the user where the logs are: `PROJECT/.factory/logs/` (stream-json).
 - After a run, read `PROJECT/.factory/LOOSE-ENDS.md` and `PROJECT/.factory/blocked/` and report them. A `[high]` item
-  stopped the Run on purpose.
+  stopped the Run on purpose. The `[low]` items are in `PROJECT/.factory/BACKLOG.md` as one list (`factory status`):
+  ask the user once whether to ticket all or drop them.
 - Requires a clean git tree on `base_branch` (default `main`), and `gh` logged in for the draft PRs.
