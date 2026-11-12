@@ -44,8 +44,8 @@ def session_command(
     return [*cmd, "--strict-mcp-config", "--no-session-persistence"]
 
 
-def parse_stream(text: str) -> SessionResult:
-    """The last `result` event of a stream-json log."""
+def last_result(text: str) -> dict[str, object] | None:
+    """The last `result` event of a stream-json log; None when the Session never finished."""
     final: dict[str, object] | None = None
     for line in text.splitlines():
         try:
@@ -54,6 +54,12 @@ def parse_stream(text: str) -> SessionResult:
             continue
         if isinstance(event, dict) and event.get("type") == "result":
             final = event
+    return final
+
+
+def parse_stream(text: str) -> SessionResult:
+    """The last `result` event of a stream-json log."""
+    final = last_result(text)
     if final is None:
         return SessionResult(ok=False, text="")
     cost = float(str(final.get("total_cost_usd") or 0.0))
