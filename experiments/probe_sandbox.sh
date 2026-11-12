@@ -17,7 +17,7 @@ cat > srt-settings.json <<JSON
 {"network": {"allowedDomains": ["api.anthropic.com", "statsig.anthropic.com", "sentry.io", "claude.ai"], "deniedDomains": []},
  "filesystem": {"denyRead": [], "allowWrite": [".", "$HOME/.claude", "$HOME/.claude.json", "/tmp", "$TMPDIR"], "denyWrite": []}}
 JSON
-t() { local s=$(date +%s); echo "== $1"; shift; "$@" 2>&1 | tail -4; echo "exit=$? seconds=$(( $(date +%s) - s ))"; }
+t() { local s=$(date +%s) out rc; echo "== $1"; shift; out=$("$@" 2>&1); rc=$?; echo "$out" | tail -4; echo "exit=$rc seconds=$(( $(date +%s) - s ))"; }
 p='Reply with exactly SANDBOX-OK-5521.'
 if command -v srt >/dev/null; then
   S="srt --settings srt-settings.json"
