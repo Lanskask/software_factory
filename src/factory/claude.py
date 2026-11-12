@@ -58,7 +58,9 @@ def parse_stream(text: str) -> SessionResult:
         return SessionResult(ok=False, text="")
     cost = float(str(final.get("total_cost_usd") or 0.0))
     if final.get("subtype") != "success" or final.get("is_error"):
-        return SessionResult(ok=False, text=f"session ended with {final.get('subtype')}", cost_usd=cost)
+        # an API error (e.g. "Credit balance is too low") comes as subtype success with is_error and the message
+        why = final.get("result") if final.get("is_error") and final.get("result") else final.get("subtype")
+        return SessionResult(ok=False, text=f"session ended with {why}", cost_usd=cost)
     return SessionResult(ok=True, text=str(final.get("result") or ""), cost_usd=cost)
 
 
