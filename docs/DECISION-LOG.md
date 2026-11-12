@@ -202,3 +202,12 @@ fails, the Run stops, as it does mid-Run.
   `egm-review-loop` result, CI and PR state, review PASS, deploy (`make smoke`) and retro. A finished Project stays at
   `verify` until the Owner moves on. Reason: YAGNI; the Owner asked for the stage line, not new detectors.
 - `factory status` and `factory bootstrap` print the same line, `Stage: build (34/50 tickets), Next: factory run .`.
+
+## `commit()` keeps `git add -f` (2026-11-12)
+
+- `commit()` runs `git add -f -- <paths>` and `git commit -- <paths>`. The paths are the exact files the Factory just
+  wrote (`CLAUDE.md`, `.claude/settings.json`, `docs/OWNER-ANSWERS.md`, `.factory/config.toml`, `.gitignore`); no
+  directory, glob or `-A`, so `-f` can add nothing else. Both calls take the same pathspec, so other staged files stay out.
+- Kept, because the Owner's global gitignore has `.claude/` and without `-f` the shared `.claude/settings.json` would
+  never be committed. The one file a Project ignores on purpose and the Factory still writes is `.claude/settings.json`.
+- `tests/test_commit.py` pins it: under an ignore rule only the named file is committed. Closes #25.
