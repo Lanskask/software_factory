@@ -157,6 +157,7 @@ def test_run_stacks_branches_pushes_and_opens_draft_prs(project: Path) -> None:
     assert prs[0][prs[0].index("--base") + 1] == "main"
     assert prs[1][prs[1].index("--base") + 1] == "factory/01-a"
     assert all("merge" not in " ".join(c) for c in prs)
+    assert [c[c.index("--title") + 1] for c in prs] == ["feat: [01] a", "feat: [02] b"]
     assert "[low] typo" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
     sessions = claude_calls(project)
     assert len(sessions) == 4  # implement + review per ticket
@@ -296,6 +297,22 @@ def test_run_stops_when_the_resolver_fails(project: Path, monkeypatch: pytest.Mo
     assert "auth bypass" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
 
 
+def test_next_run_resolves_the_previous_tickets_high_item_first(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_HIGH", "01")
+    monkeypatch.setenv("FAKE_RESOLVE_FAIL", "1")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project, max_tickets=1).run() == 1  # 01 is published, its [high] item is still open
+    monkeypatch.delenv("FAKE_RESOLVE_FAIL")
+    assert factory(project).run() == 0
+    calls = [c[c.index("-p") + 1] for c in claude_calls(project)]
+    assert sum("RESOLVE" in p for p in calls) == 2  # the failed one, then the one at the start of the second Run
+    resolution = project / ".factory" / "resolutions" / "01.md"
+    implement_02 = next(p for p in calls if "Ticket 02" in p and "VERDICT" not in p)
+    assert str(resolution) in implement_02 and str(project / ".factory" / "handoffs" / "01.md") in implement_02
+    assert factory(project).run() == 0  # nothing left: a settled [high] item is not resolved again
+    assert sum("RESOLVE" in c[c.index("-p") + 1] for c in claude_calls(project)) == 2
+
+
 def test_loose_ends_of_a_blocked_ticket_are_logged(project: Path) -> None:
     with_tickets(project, {"01": {"slug": "a"}})
     cfg = Config(tickets_dir="t", checks=("false",), implement_skills=(), review_skills=())
@@ -336,13 +353,39 @@ def test_dry_run_spends_nothing(project: Path, capsys: pytest.CaptureFixture[str
     assert claude_calls(project) == [] and "/goal" in capsys.readouterr().out
 
 
-def test_real_run_prints_the_dry_run_preview_before_the_first_session(
+def test_next_run_stacks_on_the_factory_branches_not_on_the_checked_out_branch(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project, max_tickets=1).run() == 0
+    git(project, "switch", "-q", "-c", "scratch", "main")
+    (project / "hand.txt").write_text("a hand-made branch the Run must ignore")
+    git(project, "add", "hand.txt")
+    git(project, "commit", "-qm", "hand-made")
+    assert factory(project).run() == 0
+    assert git(project, "merge-base", "--is-ancestor", "factory/01-a", "factory/02-b") == ""
+    assert (
+        subprocess.run(["git", "merge-base", "--is-ancestor", "scratch", "factory/02-b"], cwd=project).returncode == 1
+    )
+    assert gh_calls(project)[-1][gh_calls(project)[-1].index("--base") + 1] == "factory/01-a"
+
+
+def test_publish_pushes_a_base_branch_that_is_missing_on_origin(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project, max_tickets=1).run() == 0
+    git(project, "push", "-q", "origin", "--delete", "factory/01-a")
+    assert factory(project).run() == 0
+    assert "refs/heads/factory/01-a" in git(project, "ls-remote", "--heads", "origin")
+
+
+def test_real_run_prints_the_next_line_and_the_stages_but_not_the_claude_command(
     project: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with_tickets(project, {"01": {"slug": "a"}})
     assert factory(project).run() == 0
     out = capsys.readouterr().out
     assert out.index("next: 01 on factory/01-a from main") < out.index("01: implement session 1")
+    assert "/goal" not in out
+    stages = ["implement session 1", "checking", "review session 1", "publishing"]
+    assert [out.index(x) for x in stages] == sorted(out.index(x) for x in stages)
 
 
 def test_review_session_may_run_the_configured_checks(project: Path) -> None:

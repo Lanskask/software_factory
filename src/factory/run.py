@@ -12,6 +12,7 @@ from pathlib import Path
 
 from factory.claude import SessionResult, run_session, session_command
 from factory.config import Config
+from factory.pr_text import code_quote, pr_title
 from factory.prompts import (
     blocked_reason,
     fix_goal,
@@ -155,6 +156,43 @@ class Factory:
             return t
         return None
 
+    def tip_ticket(self) -> Ticket | None:
+        """The newest unblocked Ticket that has a Factory branch: the tip of the stack.
+
+        shortcut: any existing branch of an unblocked Ticket counts as done work; upgrade when Tickets can be
+        abandoned half-way without a Blocked marker.
+        """
+        blocked = self.blocked_keys()
+        for t in reversed(self.tracker.status()):
+            if t.file_key not in blocked and self.git("branch", "--list", t.branch(self.cfg.branch_prefix)):
+                return t
+        return None
+
+    def stack_tip(self) -> str:
+        """The branch the next Ticket stacks on, else `base_branch`. Never the checked-out branch, which may be
+        hand-made."""
+        tip = self.tip_ticket()
+        return tip.branch(self.cfg.branch_prefix) if tip else self.cfg.base_branch
+
+    def carried_over(self, dry_run: bool) -> tuple[Path | None, Path | None] | None:
+        """The Handoff and resolution of the Ticket the stack ends on, from an earlier Run; None if its resolver fails.
+
+        A [high] item without a resolution is resolved first, which is what the end of the previous Run would have
+        done had it not stopped. `--dry-run` spends nothing, so it only passes on a resolution that already exists.
+        """
+        tip = self.tip_ticket()
+        handoff = self.state / "handoffs" / f"{tip.file_key}.md" if tip else None
+        if tip is None or handoff is None or not handoff.exists():
+            return None, None
+        resolution = self.state / "resolutions" / f"{tip.file_key}.md"
+        if resolution.exists():
+            return handoff, resolution
+        if dry_run or not has_high_loose_end(handoff.read_text()):
+            return handoff, None
+        self.say(f"{tip.num}: [high] loose end left by an earlier Run, resolving it first")
+        self.ensure_plugin()  # the resolver gets the same skills as it would at the end of a Run
+        return (handoff, resolved) if (resolved := self.resolve(tip, handoff)) else None
+
     def run(self, *, dry_run: bool = False) -> int:
         problem = self.preflight()
         if problem:
@@ -167,10 +205,16 @@ class Factory:
             return 1
         if not dry_run:  # lessons are per Run: a stale one would warn about a mistake the Owner already fixed
             (self.state / "LESSONS.md").unlink(missing_ok=True)
-        base = self.git("rev-parse", "--abbrev-ref", "HEAD")
+        base = self.stack_tip()
+        if base != self.git("rev-parse", "--abbrev-ref", "HEAD"):
+            self.say(f"switching to {base}, the tip of the stack")
+            self.git("switch", "-q", base)
         skipped: set[str] = set()
-        previous: Path | None = None
-        resolution: Path | None = None
+        carried = self.carried_over(dry_run)
+        if carried is None:
+            self.say("[high] loose end, the resolver failed. Stopping: read .factory/LOOSE-ENDS.md")
+            return 1
+        previous, resolution = carried
         done, blocked = 0, 0
         for _ in range(self.cfg.max_tickets):
             ticket = self.next_ticket(skipped)
@@ -183,8 +227,8 @@ class Factory:
                 self.preview(ticket, base, handoff, previous, resolution)
                 return 0
             self.ensure_plugin()
-            if done == 0 and blocked == 0:  # the same preview as --dry-run, so the Owner sees what starts
-                self.preview(ticket, base, handoff, previous, resolution)
+            if done == 0 and blocked == 0:  # only the `next:` line; --dry-run adds the claude command
+                self.preview(ticket, base, handoff, previous, resolution, command=False)
             try:
                 out = self.ticket(ticket, base, handoff, previous, resolution)
             except PushError as e:
@@ -209,8 +253,19 @@ class Factory:
         self.say(f"Run finished: {done} pull requests, {blocked} Blocked, ${self.cost:.2f} spent")
         return 1 if blocked else 0
 
-    def preview(self, t: Ticket, base: str, handoff: Path, previous: Path | None, resolution: Path | None) -> None:
+    def preview(
+        self,
+        t: Ticket,
+        base: str,
+        handoff: Path,
+        previous: Path | None,
+        resolution: Path | None,
+        *,
+        command: bool = True,
+    ) -> None:
         print(f"next: {t.num} on {t.branch(self.cfg.branch_prefix)} from {base}", flush=True)
+        if not command:
+            return
         goal_text = goal(t, self.tracker.command, handoff, previous, self.cfg.checks, resolution, self.lessons)
         name = f"factory {self.project.name} {t.num} implement 1"
         print(shlex.join(self.command(goal_text, review=False, name=name)), flush=True)
@@ -297,12 +352,14 @@ class Factory:
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
         self.log_loose_ends(t, branch, handoff)  # before publishing: a failed push must not lose them
+        self.say(f"{t.num}: publishing, pushing {branch} and opening a draft pull request")
         self.publish(t.num, t.slug, base, branch, handoff, review_log)
         return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(handoff.read_text()))
 
     def verify(self, t: Ticket, base: str, res: SessionResult, handoff: Path) -> str | None:
         """Why the Ticket is not done; None when it is. The Factory's own checks outrank what the Session says."""
         reason = blocked_reason(res.text)
+        self.say(f"{t.num}: checking the Ticket is done, tree clean, commits, Handoff, {', '.join(self.cfg.checks)}")
         problem = self.objective_problem(t, base, handoff)
         if problem:
             return reason or (f"session failed: {res.text}" if not res.ok else problem)
@@ -359,18 +416,22 @@ class Factory:
         pending.parent.mkdir(parents=True, exist_ok=True)
         record = {"num": num, "slug": slug, "base": base, "branch": branch, "handoff": str(handoff)}
         pending.write_text(json.dumps({**record, "review_log": review_log}))
-        push = subprocess.run(
-            ["git", "push", "-q", "-u", "origin", branch], cwd=self.project, capture_output=True, text=True
-        )
-        if push.returncode != 0:
-            raise PushError(f"{num}: git push failed: {push.stderr.strip()}")
-        body = (
+        # `gh pr create` answers "Base ref must be a branch" for a base that origin does not have.
+        on_origin = self.git("ls-remote", "--heads", "origin", base)
+        for b in (branch,) if on_origin else (base, branch):
+            push = subprocess.run(
+                ["git", "push", "-q", "-u", "origin", b], cwd=self.project, capture_output=True, text=True
+            )
+            if push.returncode != 0:
+                raise PushError(f"{num}: git push of {b} failed: {push.stderr.strip()}")
+        ticket = self.tracker.show(num)
+        body = code_quote(
             f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
-            f"## Ticket\n\n{self.tracker.show(num)}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
+            f"## Ticket\n\n{ticket}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
         )
         pr = subprocess.run(
-            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch, "--title", f"{num} {slug}",
-             "--body", body],
+            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch,
+             "--title", pr_title(ticket, num, slug), "--body", body],
             cwd=self.project, capture_output=True, text=True,
         )  # fmt: skip
         if pr.returncode != 0:

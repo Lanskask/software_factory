@@ -166,3 +166,28 @@ handoff) and `docs/OWNER-ANSWERS.md` (the questions only the owner can answer, e
 asks only the unanswered ones, in one batch. An existing file is never overwritten; an existing `CLAUDE.md` gets one
 line saying the template was not applied. The templates get their own commit, with `git add -f` because a global
 excludes file often ignores `.claude/`. Not measured yet: how many messages this saves on the next project.
+
+## 2026-10-31 The next Ticket stacks on the newest Factory branch, and publish pushes a missing base
+
+Reason: measured failure in a real Run. A hand-made branch was checked out when `factory run` started, so the Run took
+it as the base. Ticket 04 was stacked on it, and `gh pr create` then failed with "Base ref must be a branch" because
+origin never had that branch. The base is now the newest unblocked Ticket branch (else `base_branch`), and the Run
+switches to it, so the checked-out branch no longer matters. `publish` also pushes the base first when origin lacks it.
+Both are tested with a real git origin (see LESSONS.md).
+
+## 2026-10-31 A Run starts by resolving the [high] items its predecessor left
+
+Reason: the Owner's requirement, from the Instagram project: ticket 03 left a `[high]` Turnstile item and the Run that
+wrote it stopped (or was interrupted) before the resolver ran. The first Run now takes the Handoff of the Ticket the
+stack ends on as `previous`. A `[high]` item with no `.factory/resolutions/<ticket>.md` is resolved first; an existing
+resolution is passed on to the next Ticket. `--dry-run` spends nothing, so it never starts the resolver. If the resolver
+fails, the Run stops, as it does mid-Run.
+
+## PR title is `type: [NN] Ticket title`, code in the body is backticked (2026-10-31)
+
+- Title: `feat: [08] Page changes for Hosted mode`, taken from the Ticket's `# NN: title` heading. The type is the
+  Ticket's optional `**Type:**` line (`test`, `docs`, ...), default `feat`. Reason: the Owner's requirement (Conventional
+  Commits style).
+- Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
+  Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
+- The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
