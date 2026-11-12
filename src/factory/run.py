@@ -18,6 +18,7 @@ from factory.prompts import (
     fix_goal,
     goal,
     has_high_loose_end,
+    low_loose_ends,
     parse_verdict,
     resolve_prompt,
     review_prompt,
@@ -229,6 +230,7 @@ class Factory:
             return 1
         previous, resolution = carried
         done, blocked = 0, 0
+        logged_before = self.loose_ends_size()
         for _ in range(self.cfg.max_tickets):
             ticket = self.next_ticket(skipped)
             if ticket is None:
@@ -263,6 +265,8 @@ class Factory:
                         f"{ticket.num}: [high] loose end, the resolver failed. Stopping: read .factory/LOOSE-ENDS.md"
                     )
                     return 1
+        if filed := self.file_backlog(logged_before):
+            self.say(f"{filed} [low] loose ends filed as Backlog tickets in .factory/BACKLOG.md")
         self.say(f"Run finished: {done} pull requests, {blocked} Blocked, ${self.cost:.2f} spent")
         return 1 if blocked else 0
 
@@ -323,6 +327,22 @@ class Factory:
         if handoff.exists():
             with (self.state / "LOOSE-ENDS.md").open("a") as f:
                 f.write(f"\n<!-- {t.num} {t.slug}, branch {branch} -->\n{handoff.read_text().rstrip()}\n")
+
+    def loose_ends_size(self) -> int:
+        loose = self.state / "LOOSE-ENDS.md"
+        return len(loose.read_text()) if loose.exists() else 0
+
+    def file_backlog(self, start: int) -> int:
+        """Each [low] loose end this Run logged (after `start`) becomes one Backlog ticket line, once, so a line the
+        Owner dropped stays dropped. Returns how many are new."""
+        if self.loose_ends_size() <= start:
+            return 0
+        backlog = self.state / "BACKLOG.md"
+        have = backlog.read_text() if backlog.exists() else "# Backlog\n\n"
+        logged = (self.state / "LOOSE-ENDS.md").read_text()[start:]
+        new = [line for line in low_loose_ends(logged) if line not in have.splitlines()]
+        backlog.write_text(have + "".join(f"{line}\n" for line in new))
+        return len(new)
 
     def skills(self) -> tuple[str, ...]:
         return (*self.cfg.implement_skills, *self.cfg.review_skills)

@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from factory.cli import main
 from factory.config import Config
 from factory.run import Factory
 from factory.tracker import Ticket
@@ -321,6 +322,23 @@ def test_loose_ends_of_a_blocked_ticket_are_logged(project: Path) -> None:
     cfg = Config(tickets_dir="t", checks=("false",), implement_skills=(), review_skills=())
     assert Factory(project, cfg, python=sys.executable).run() == 1
     assert "[low] typo" in (project / ".factory" / "LOOSE-ENDS.md").read_text()
+
+
+def test_low_loose_ends_become_backlog_tickets_at_the_end_of_a_run(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project).run() == 0
+    backlog = project / ".factory" / "BACKLOG.md"
+    assert backlog.read_text().splitlines()[-2:] == ["- [ ] typo (from 01 a)", "- [ ] typo (from 02 b)"]
+    backlog.write_text(backlog.read_text().replace("- [ ] typo (from 01 a)\n", ""))  # the Owner drops one
+    factory(project).run()  # a later Run files neither the same nor a dropped loose end again
+    assert backlog.read_text().count("- [ ]") == 1
+    (project / ".factory" / "config.toml").write_text('tickets_dir = "t"\nchecks = ["true"]\n')
+    assert main(["status", str(project)]) == 0
+    out = capsys.readouterr().out
+    assert "Backlog: 1 [low] loose ends, ticket all or drop" in out
+    assert "  - [ ] typo (from 02 b)\n" in out
 
 
 def test_blocked_claim_on_a_verified_ticket_becomes_a_high_loose_end(

@@ -8,6 +8,7 @@ from factory.prompts import (
     fix_goal,
     goal,
     has_high_loose_end,
+    low_loose_ends,
     parse_verdict,
     review_prompt,
     session_rules,
@@ -90,3 +91,16 @@ def test_blocked_reason() -> None:
 def test_has_high_loose_end() -> None:
     assert has_high_loose_end("## Out of scope\n- [high] auth bypass in admin.go\n")
     assert not has_high_loose_end("## Out of scope\n- [low] typo in README\n")
+
+
+def test_low_loose_ends_joins_wrapped_items_and_skips_high_and_resolver_text() -> None:
+    log = (
+        "\n<!-- 05 merge, branch factory/05-merge -->\n# Handoff 05\n\n## Out of scope\n\n"
+        "- [low] The review step was skipped: the diff is\n  about 20 lines.\n- [high] auth bypass\n"
+        "\n## Owner decisions\n\n- [low] Uses --merge.\n"
+        "\n<!-- 05 merge: decision of the opus resolver -->\n- [low] not from a Handoff\n"
+    )
+    assert low_loose_ends(log) == [
+        "- [ ] The review step was skipped: the diff is about 20 lines. (from 05 merge)",
+        "- [ ] Uses --merge. (from 05 merge)",
+    ]
