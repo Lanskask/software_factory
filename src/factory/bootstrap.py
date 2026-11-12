@@ -44,7 +44,9 @@ def find_spec(project: Path) -> Path | None:
 def answered(project: Path) -> bool:
     """Coarse exit check of `answers`: Q1, the only question with no default, has an Answer."""
     f = project / "docs" / "OWNER-ANSWERS.md"
-    return f.exists() and re.search(r"^## 1\.(?:(?!^## ).)*?^Answer:[ \t]*\S", f.read_text(), re.S | re.M) is not None
+    # The answer may follow `Answer:` on the same line or sit on the lines below, before the next `## ` heading.
+    pattern = r"^## 1\.(?:(?!^## ).)*?^Answer:(?:[ \t]*\S|\s+(?!## )\S)"
+    return f.exists() and re.search(pattern, f.read_text(), re.S | re.M) is not None
 
 
 def next_step(project: Path, cfg: Config) -> tuple[str, str]:

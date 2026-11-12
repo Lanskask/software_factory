@@ -128,6 +128,10 @@ def test_next_step_before_tickets_goes_idea_answers_spec_tickets(tmp_path: Path)
     answers = tmp_path / "docs" / "OWNER-ANSWERS.md"
     answers.write_text("## 1. Idea\n\nDefault: none.\n\nAnswer:\n\n## 2. License\n\nAnswer: private\n")
     assert next_step(tmp_path, CFG)[0] == "answers"  # only Q2 is answered
+    answers.write_text("## 1. Idea\n\nAnswer:\n\n## 2. License\n\nAnswer: private\n")
+    assert next_step(tmp_path, CFG)[0] == "answers"  # Q1 empty: the next heading is not its answer
+    answers.write_text("## 1. Idea\n\nAnswer:\n\nA todo app\nfor me\n\n## 2. License\n\nAnswer:\n")
+    assert next_step(tmp_path, CFG)[0] == "spec"  # answer on the lines below
     answers.write_text("## 1. Idea\n\nAnswer: a todo app\n")
     assert next_step(tmp_path, CFG) == ("spec", f"factory plan {tmp_path}")
     (tmp_path / "docs" / "SPEC.md").write_text("spec")
