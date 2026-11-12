@@ -12,6 +12,7 @@ from pathlib import Path
 from factory.bootstrap import branch_warning, copy_templates, next_step
 from factory.config import Config, ConfigError, config_path, load_config, template
 from factory.plan import Planner
+from factory.retro import retro
 from factory.run import Factory
 from factory.tracker import Tracker
 
@@ -129,6 +130,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--budget-usd", type=float, help="per implementation Session")
     r.add_argument("--timeout-minutes", type=int, help="per Session")
     sub.add_parser("status", help="Tickets, Blocked Tickets and loose ends").add_argument("project", type=Path)
+    sub.add_parser("retro", help="count the Owner's interventions, append a table to LESSONS.md").add_argument(
+        "project", type=Path
+    )
     args = p.parse_args(argv)
     if args.cmd == "install-skill":
         return cmd_install_skill(args.dir)
@@ -140,6 +144,9 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_bootstrap(project)
         if args.cmd == "status":
             return cmd_status(project)
+        if args.cmd == "retro":
+            print(f"✔ appended a retro table to {rel(retro(project))}")
+            return 0
         if args.cmd == "plan" and not config_path(project).exists():
             cmd_init(project)
         cfg = load_config(project)
