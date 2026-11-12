@@ -206,7 +206,7 @@ class Factory:
             self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
             return 1
         if not dry_run:  # lessons are per Run: a stale one would warn about a mistake the Owner already fixed
-            (self.state / "LESSONS.md").unlink(missing_ok=True)
+            self.reset_lessons()
         base = self.stack_tip()
         if base != self.git("rev-parse", "--abbrev-ref", "HEAD"):
             self.say(f"switching to {base}, the tip of the stack")
@@ -290,6 +290,14 @@ class Factory:
     def lessons(self) -> Path | None:
         path = self.state / "LESSONS.md"
         return path if path.exists() else None
+
+    def reset_lessons(self) -> None:
+        """Drop the Run's failure lessons but keep `factory retro` lines: they outlive a Run."""
+        path = self.state / "LESSONS.md"
+        if not path.exists():
+            return
+        keep = [ln for ln in path.read_text().splitlines(keepends=True) if ln.startswith("- retro ")]
+        path.write_text("".join(keep)) if keep else path.unlink()
 
     def lesson(self, t: Ticket, what: str) -> None:
         """One line per failure, read by every later Ticket's Session in this Run: a mistake is not made twice."""
