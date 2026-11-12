@@ -236,3 +236,15 @@ The blind review benchmark (`experiments/review-bench/judge-opus.md`) found that
 reported a finding without showing the arithmetic. `review_prompt` now asks for the arithmetic or trace, the question
 "would a test fail if this branch were deleted?", and a re-check of each finding before it is written. Source: measured
 result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
+
+## Opt-in `merge = "green"` auto-merges the bottom of the stack (2026-11-12)
+
+- Default `merge = "never"` keeps the rule that the Factory never merges. Any other value than `never` or `green` is a
+  config error. Reason: Owner's requirement (docs/factory-analysis.md P8, issue #18).
+- With `green`, after review PASS and `gh pr create`, the Factory runs `gh pr merge --auto --merge` on the new PR, so
+  GitHub merges it once its required checks are green. (Since 2026-11-14 PRs are not drafts, so no `gh pr ready` step.)
+  Auto-merge needs required status checks on the base branch, else GitHub merges at once.
+- Only a PR whose base is `base_branch` is merged. A PR stacked on another factory branch is left open: merged, it
+  would land in that branch, not in `base_branch`. Later PRs of the stack are not retargeted after the bottom one merges.
+- If `gh pr merge` fails (auto-merge disabled in the repo, missing token scope), the Run prints a warning and goes on:
+  the PR is already open, so nothing is lost and the publish is not retried.
