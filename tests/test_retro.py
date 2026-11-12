@@ -61,3 +61,12 @@ def test_run_keeps_retro_lines(tmp_path: Path) -> None:
     (tmp_path / "LESSONS.md").write_text("- retro git_pr [open] 1 of 2 x\n- 3 slug [open] review FAIL y\n")
     r.reset_lessons()
     assert (tmp_path / "LESSONS.md").read_text() == "- retro git_pr [open] 1 of 2 x\n"
+
+
+def test_retro_without_transcripts_leaves_lessons_alone(tmp_path: Path) -> None:
+    lessons = tmp_path / ".factory" / "LESSONS.md"
+    lessons.parent.mkdir()
+    lessons.write_text("- retro X [open] 3 of 9 typed messages on 2026-01-01\n")
+    retro(tmp_path, directory=tmp_path / "no-such-folder")
+    assert "[open]" in lessons.read_text()
+    assert "[resolved]" not in lessons.read_text()

@@ -100,6 +100,8 @@ def retro(project: Path, directory: Path | None = None, today: date | None = Non
     """
     total, counts = count(directory or transcript_dir(project))
     path = project / ".factory" / "LESSONS.md"
+    if total == 0:  # no data is not a shrunk bucket: keep the old lines as they are
+        return path
     path.parent.mkdir(parents=True, exist_ok=True)
     kept = []
     for ln in path.read_text().splitlines(keepends=True) if path.exists() else []:
