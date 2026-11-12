@@ -30,6 +30,5 @@ def test_bootstrap_output_uses_relative_paths(
         "✔ wrote .factory/config.toml  (check `checks` and `tickets_dir`, commit any edit)",
         "✔ added .factory/*, !.factory/config.toml to .gitignore",
         "✔ committed .factory/config.toml, .gitignore",
-        "Stage: A Spec exists (docs/SPEC.md), no Tickets",
-        "Next:  factory plan . --spec docs/SPEC.md",
+        "Stage: tickets (spec docs/SPEC.md), Next: factory plan . --spec docs/SPEC.md",
     ]

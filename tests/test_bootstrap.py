@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from factory.bootstrap import next_step
 from factory.cli import main
+from factory.config import Config
+from factory.tracker import Ticket, Tracker
 
 
 def repo(tmp_path: Path, branch: str = "main") -> Path:
@@ -92,6 +95,54 @@ def test_bootstrap_never_overwrites_an_existing_claude_md(tmp_path: Path, capsys
     assert (p / "CLAUDE.md").read_text() == "the owner's rules\n"
     assert "CLAUDE.md exists: the rules template was not applied" in capsys.readouterr().out
     assert (p / ".claude" / "settings.json").exists() and (p / "docs" / "OWNER-ANSWERS.md").exists()
+
+
+def tk(num: str, state: str, ready: bool = False) -> Ticket:
+    return Ticket(num=num, state=state, ready=ready, slug="x")
+
+
+CFG = Config(tickets_dir="t", checks=())
+
+
+@pytest.mark.parametrize(
+    "tickets, expected",
+    [
+        ([tk("01", "done"), tk("02", "todo", True)], ("build (1/2 tickets)", "factory run P")),
+        ([tk("01", "done"), tk("02", "todo")], ("build (1/2 tickets), blocked", "factory status P")),
+        ([tk("01", "done")], ("verify (1/1 tickets)", "review the draft PRs")),
+    ],
+)
+def test_next_step_with_tickets(
+    monkeypatch: pytest.MonkeyPatch, tickets: list[Ticket], expected: tuple[str, str]
+) -> None:
+    monkeypatch.setattr(Tracker, "exists", lambda self: True)
+    monkeypatch.setattr(Tracker, "status", lambda self: tickets)
+    assert next_step(Path("P"), CFG) == expected
+
+
+def test_next_step_before_tickets_goes_idea_answers_spec_tickets(tmp_path: Path) -> None:
+    assert next_step(tmp_path, CFG) == ("idea", f"write docs/IDEA.md, then factory plan {tmp_path}")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "IDEA.md").write_text("an idea\n")
+    assert next_step(tmp_path, CFG)[0] == "answers"
+    answers = tmp_path / "docs" / "OWNER-ANSWERS.md"
+    answers.write_text("## 1. Idea\n\nDefault: none.\n\nAnswer:\n\n## 2. License\n\nAnswer: private\n")
+    assert next_step(tmp_path, CFG)[0] == "answers"  # only Q2 is answered
+    answers.write_text("## 1. Idea\n\nAnswer: a todo app\n")
+    assert next_step(tmp_path, CFG) == ("spec", f"factory plan {tmp_path}")
+    (tmp_path / "docs" / "SPEC.md").write_text("spec")
+    assert next_step(tmp_path, CFG)[0] == "tickets (spec docs/SPEC.md)"
+
+
+def test_status_prints_the_stage_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    p = repo(tmp_path)
+    main(["bootstrap", str(p)])
+    capsys.readouterr()
+    monkeypatch.chdir(p)
+    main(["status", str(p)])
+    assert capsys.readouterr().out.startswith("Stage: idea, Next: write docs/IDEA.md, then factory plan .\n")
 
 
 def test_session_start_hook_prints_the_latest_handoff_and_exits_0_without_one(tmp_path: Path) -> None:
