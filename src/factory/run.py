@@ -451,3 +451,11 @@ class Factory:
             raise PushError(f"{num}: gh pr create failed: {pr.stderr.strip()}")
         pending.unlink()
         self.say(f"{num}: draft pull request {pr.stdout.strip()}")
+        # publish() runs only after review PASS; a PR stacked on another branch would merge into that branch
+        if self.cfg.merge == "green" and base == self.cfg.base_branch:
+            # GitHub refuses auto-merge on a draft, so the PR is marked ready first
+            for cmd in (["ready", branch], ["merge", "--auto", "--merge", branch]):
+                gh = subprocess.run([self.gh, "pr", *cmd], cwd=self.project, capture_output=True, text=True)
+                if gh.returncode != 0:  # the PR stays open for the Owner to merge by hand
+                    self.say(f"{num}: warning: gh pr {cmd[0]} failed, not auto-merged: {gh.stderr.strip()}")
+                    break

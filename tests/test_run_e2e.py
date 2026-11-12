@@ -81,6 +81,9 @@ result("DONE")
 FAKE_GH = r"""
 import json, os, sys
 with open(os.environ["FAKE_GH_LOG"], "a") as f: f.write(json.dumps(sys.argv[1:]) + "\n")
+if sys.argv[2] == "merge" and os.environ.get("FAKE_GH_MERGE_FAIL"):
+    print("auto-merge is not allowed for this repository", file=sys.stderr)
+    sys.exit(1)
 if os.environ.get("FAKE_GH_FAIL"):
     print("GraphQL: Base ref must be a branch", file=sys.stderr)
     sys.exit(1)
@@ -407,3 +410,36 @@ def test_dockerfile_built_by_a_make_check_does_not_warn(project: Path, capsys: p
     cfg = Config(tickets_dir="t", checks=("make image",), implement_skills=(), review_skills=())
     assert Factory(project, cfg, python=sys.executable).run(dry_run=True) == 0
     assert "Dockerfile" not in capsys.readouterr().out
+
+
+def test_merge_green_turns_on_auto_merge_only_for_the_pr_on_the_base_branch(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project, merge="green").run() == 0
+    calls = gh_calls(project)
+    assert [c[:2] for c in calls] == [["pr", "create"], ["pr", "ready"], ["pr", "merge"], ["pr", "create"]]
+    assert calls[1] == ["pr", "ready", "factory/01-a"]
+    assert calls[2] == ["pr", "merge", "--auto", "--merge", "factory/01-a"]
+    assert "--draft" in calls[3]  # 02 stacks on factory/01-a: it stays a draft and is not merged
+
+
+def test_merge_never_does_not_merge(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, merge="never").run() == 0
+    assert [c[:2] for c in gh_calls(project)] == [["pr", "create"]]
+
+
+def test_merge_green_does_not_merge_after_review_fail(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_REVIEW_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, merge="green", review_rounds=1).run() == 1
+    assert gh_calls(project) == []
+
+
+def test_failed_auto_merge_warns_and_keeps_the_pr(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FAKE_GH_MERGE_FAIL", "1")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, merge="green").run() == 0
+    assert "gh pr merge failed, not auto-merged: auto-merge is not allowed" in capsys.readouterr().out
+    assert not list((project / ".factory" / "unpublished").glob("*.json"))  # published, not retried

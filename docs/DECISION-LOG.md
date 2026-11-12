@@ -213,3 +213,15 @@ fails, the Run stops, as it does mid-Run.
 - Interventions cannot be seen in the logs, so the Owner writes one `- ` line per intervention into
   `.factory/interventions.md`. Reason: an honest count beats a guessed one.
 - `evals/new_run.sh` gives each run a local bare `origin` and a `gh` stand-in, so the Run publishes without GitHub.
+
+## Opt-in `merge = "green"` auto-merges the bottom of the stack (2026-11-12)
+
+- Default `merge = "never"` keeps the 2026-10-30 rule: draft pull requests, never merged. Any other value than `never`
+  or `green` is a config error. Reason: Owner's requirement (docs/factory-analysis.md P8, issue #18).
+- With `green`, after review PASS and `gh pr create`, the Factory runs `gh pr ready` and then
+  `gh pr merge --auto --merge` on the new PR, so GitHub merges it once its required checks are green. Reason: GitHub
+  refuses auto-merge on a draft PR.
+- Only a PR whose base is `base_branch` is merged. A PR stacked on another factory branch stays a draft: merged, it
+  would land in that branch, not in `base_branch`.
+- If `gh pr ready` or `gh pr merge` fails (auto-merge disabled in the repo, missing token scope), the Run prints a
+  warning and goes on: the PR is already open, so nothing is lost and the publish is not retried.
