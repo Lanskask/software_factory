@@ -8,6 +8,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from factory.config import load_config
+from factory.run import Factory
+
 EVALS = Path(__file__).resolve().parent.parent / "evals"
 HIDDEN = EVALS / "hidden" / "slugify-cli"
 
@@ -78,6 +83,22 @@ def test_scores_a_run_whose_review_blocked_the_trap(tmp_path: Path) -> None:
         "interventions": 1,
     }
     assert not (run / ".hidden-tests").exists()  # the hidden tests leave the run as they found it
+
+
+def test_new_run_is_a_project_the_factory_can_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for k in ("GIT_AUTHOR", "GIT_COMMITTER"):
+        monkeypatch.setenv(f"{k}_NAME", "t")
+        monkeypatch.setenv(f"{k}_EMAIL", "t@t")
+    run = tmp_path / "eval-1"
+    subprocess.run(["sh", str(EVALS / "new_run.sh"), str(run), "sonnet"], check=True, capture_output=True)
+    cfg = load_config(run)
+    assert (cfg.model, cfg.checks) == ("sonnet", ("make test", "make lint"))
+    assert Factory(run, cfg).run(dry_run=True) == 0
+    assert "next: 01 on factory/01-core-slugify from main" in capsys.readouterr().out
+    gh = subprocess.run([str(tmp_path / "eval-1.bin" / "gh"), "pr", "create"], capture_output=True, text=True)
+    assert gh.returncode == 0 and gh.stdout.startswith("https://")
 
 
 def test_a_passed_trap_disagrees_and_red_checks_count(tmp_path: Path) -> None:
