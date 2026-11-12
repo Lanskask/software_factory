@@ -45,6 +45,11 @@ def result(text, subtype="success"):
     print(json.dumps({"type": "result", "subtype": subtype, "result": text, "total_cost_usd": 0.5}))
     sys.exit(0)
 num = re.search(r"Ticket (\S+) ", prompt).group(1)
+if num in os.environ.get("FAKE_RATE_LIMIT", "").split(",") and not os.path.exists(f".limited-{num}"):
+    open(f".limited-{num}", "w").close()
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": True, "api_error_status": 429,
+                      "result": "You've hit your 5-hour limit", "total_cost_usd": 0}))
+    sys.exit(0)
 if "RESOLVE" in prompt:
     if os.environ.get("FAKE_RESOLVE_FAIL"):
         result("", subtype="error_max_turns")
@@ -206,6 +211,19 @@ def test_run_stops_after_max_blocked(project: Path, monkeypatch: pytest.MonkeyPa
     assert factory(project, max_blocked=2).run() == 1
     assert gh_calls(project) == []
     assert not (project / ".factory" / "blocked" / "03.md").exists()
+
+
+def test_rate_limited_session_waits_and_runs_again_instead_of_blocking(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_RATE_LIMIT", "01")
+    with_tickets(project, {"01": {"slug": "a"}})
+    f = factory(project)
+    f.rate_limit_wait_s = 0
+    assert f.run() == 0
+    assert len(claude_calls(project)) == 3  # limited implement, implement again, review
+    assert not (project / ".factory" / "blocked" / "01.md").exists()
+    assert len(gh_calls(project)) == 1
 
 
 def test_review_fail_gets_one_fix_session_then_passes(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
