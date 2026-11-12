@@ -90,15 +90,22 @@ def count(directory: Path) -> tuple[int, collections.Counter[str]]:
     return total, counts
 
 
+ROW = re.compile(r"^- retro (\w+) \[open\] (\d+) of ")
+
+
 def retro(project: Path, directory: Path | None = None, today: date | None = None) -> Path:
-    """Append a dated table to LESSONS.md; every row is [open] until a later Run shows the bucket shrank."""
+    """Append one `- retro BUCKET [open] ...` line per bucket to LESSONS.md (a Run keeps these lines).
+
+    An older [open] line of a bucket becomes [resolved] when the new count is lower: the bucket shrank.
+    """
     total, counts = count(directory or transcript_dir(project))
-    rows = "".join(f"| {k} | {n} | [open] |\n" for k, n in counts.most_common())
     path = project / ".factory" / "LESSONS.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as f:
-        f.write(
-            f"\n<!-- retro {today or date.today()}: {total} typed messages -->\n"
-            f"| Owner intervention | Messages | Status |\n| --- | ---: | --- |\n{rows}"
-        )
+    kept = []
+    for ln in path.read_text().splitlines(keepends=True) if path.exists() else []:
+        m = ROW.match(ln)
+        kept.append(ln.replace("[open]", "[resolved]", 1) if m and counts.get(m[1], 0) < int(m[2]) else ln)
+    when = today or date.today()
+    new = [f"- retro {k} [open] {n} of {total} typed messages on {when}\n" for k, n in counts.most_common()]
+    path.write_text("".join(kept + new))
     return path
