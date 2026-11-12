@@ -91,7 +91,7 @@ def cmd_status(project: Path) -> int:
     tickets = tracker.status() if tracker.exists() else []
     done = sum(t.state == "done" for t in tickets)
     print(stage_line(project, cfg))
-    print(doctor())
+    print(doctor(project))
     print(f"Tickets: {done}/{len(tickets)} done")
     for t in tickets:
         print(f"  {t.num}\t{t.state}\t{'READY' if t.ready else ''}\t{t.slug}")
