@@ -30,7 +30,9 @@ factory run ~/code/app              # the unattended Run
 factory status ~/code/app           # Tickets, Blocked Tickets, loose ends
 ```
 
-If the Project already has Tickets in the `/to-tickets` format, skip `plan`.
+If the Project already has Tickets in the `/to-tickets` format, skip `plan`. `factory init` sets `tickets_dir` to the
+first folder under `.scratch/` that holds a `tickets.py` (any name, such as `tickets/` or `issues/`), and to
+`.scratch/<project>/tickets` when there is none.
 
 ## What a Run does per Ticket
 
