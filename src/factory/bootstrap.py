@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from factory.config import Config
@@ -78,3 +79,26 @@ def branch_warning(project: Path, cfg: Config) -> str | None:
     if branch != cfg.base_branch:
         return f"on branch {branch}, but base_branch is {cfg.base_branch}: switch, or set base_branch in config.toml"
     return None
+
+
+def run_command(cmd: list[str]) -> str:
+    """Output (stdout and stderr) of `cmd`; empty when it cannot run or hangs."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return r.stdout + r.stderr
+
+
+def doctor(run: Callable[[list[str]], str] = run_command) -> str:
+    """One line: MCP servers connected, gh scopes (repo, project) and whether the token can merge."""
+    mcp = [ln for ln in run(["claude", "mcp", "list"]).splitlines() if " - " in ln]
+    up = sum("Connected" in ln and "Failed" not in ln for ln in mcp)
+    scopes = re.search(r"Token scopes: (.*)", run(["gh", "auth", "status"]))
+    have = set(re.findall(r"[\w:-]+", scopes[1])) if scopes else set()
+    missing = [s for s in ("repo", "project") if s not in have]
+    perm = run(["gh", "repo", "view", "--json", "viewerPermission", "-q", ".viewerPermission"]).strip()
+    # shortcut: viewerPermission is the user's repo role; branch protection rules are not checked
+    merge = "yes" if perm in ("ADMIN", "MAINTAIN", "WRITE") else "no"
+    gh = "ok" if not missing else f"missing {', '.join(missing)}"
+    return f"Doctor: MCP {up}/{len(mcp)} up, gh scopes {gh}, can merge: {merge}"
