@@ -142,7 +142,20 @@ class Factory:
             return "`.factory/` is not git-ignored: run `factory init` or add `.factory/*` and `!.factory/config.toml`"
         if not self.tracker.exists():
             return f"no Tickets in {self.cfg.tickets_dir}: run `factory plan` first"
+        if (self.project / "Dockerfile").exists() and not self.checks_build_docker():
+            self.say("warning: no check builds the Dockerfile, so a broken image shows up only in CI or at deploy")
         return None
+
+    def checks_build_docker(self) -> bool:
+        """A check builds the image if it runs `docker` itself or is a `make` target whose recipe does."""
+        makefile = self.project / "Makefile"
+        text = makefile.read_text() if makefile.exists() else ""
+        for check in self.cfg.checks:
+            m = re.fullmatch(r"make\s+([\w-]+)", check.strip())
+            recipe = re.search(rf"^{re.escape(m[1])}:.*\n((?:\t.*\n?)*)", text, re.M) if m else None
+            if "docker" in check or (recipe and "docker" in recipe[1]):
+                return True
+        return False
 
     def next_ticket(self, skipped: set[str]) -> Ticket | None:
         blocked = self.blocked_keys()

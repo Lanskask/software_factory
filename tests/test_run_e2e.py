@@ -391,3 +391,19 @@ def test_real_run_prints_the_next_line_and_the_stages_but_not_the_claude_command
 def test_review_session_may_run_the_configured_checks(project: Path) -> None:
     f = factory(project)
     assert "Bash(test -f t/tickets.json*)" in f.review_tools()
+
+
+def test_dockerfile_no_check_builds_warns_but_runs(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (project / "Dockerfile").write_text("FROM scratch\n")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project).run(dry_run=True) == 0
+    assert "no check builds the Dockerfile" in capsys.readouterr().out
+
+
+def test_dockerfile_built_by_a_make_check_does_not_warn(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (project / "Dockerfile").write_text("FROM scratch\n")
+    (project / "Makefile").write_text("image:\n\tdocker build -t x .\n")
+    with_tickets(project, {"01": {"slug": "a"}})
+    cfg = Config(tickets_dir="t", checks=("make image",), implement_skills=(), review_skills=())
+    assert Factory(project, cfg, python=sys.executable).run(dry_run=True) == 0
+    assert "Dockerfile" not in capsys.readouterr().out

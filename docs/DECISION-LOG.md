@@ -156,6 +156,15 @@ review of that Ticket PASSes (not when the fix Session's checks pass: the review
 Blocked lessons stay `[open]`. Other reasons from `verify()` (such as a crashed implement Session) are still recorded;
 telling them apart from code failures needs a typed reason. Not measured: whether it lowers the FAIL rate.
 
+## 2026-11-12 `checks` start as what CI runs; preflight warns about an unbuilt Dockerfile
+
+Reason: measured, in `docs/factory-analysis.md` (P4): at least 6 failures surfaced only on GitHub or at deploy because
+local checks were weaker than CI. `factory init` now copies the `make X` lines of `.github/workflows/*.yml` into
+`checks`, when X is a Makefile target, ahead of the known names (`test`, `lint`, ...). Targets named like `setup`,
+`install`, `deploy`, `release`, `publish` or `smoke` are left out: they install or ship, they do not check. When a
+`Dockerfile` exists and no check runs `docker` (directly or in its make recipe), `factory run` prints a warning and goes
+on: a refusal would stop Projects whose image is built only at deploy.
+
 ## 2026-11-12 `factory bootstrap` writes a rules `CLAUDE.md`, a handoff hook and the owner interview
 
 Reason: measured, in `docs/factory-analysis.md` (the owner's 311 typed messages while building terminal-task-tracker):
