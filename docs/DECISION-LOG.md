@@ -191,3 +191,11 @@ fails, the Run stops, as it does mid-Run.
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
   Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
 - The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
+
+## 2026-11-12 Sandbox probe: `srt` works for `claude -p` and git; Docker needs the host socket; `sbx` not yet probed
+
+Reason: measured result (`experiments/probe_sandbox.sh`, Issue #26). Under `srt` 0.0.82, `claude -p` (about 10 s) and
+`git commit` work once `api.anthropic.com` is allowed and `~/.claude` is writable; writes elsewhere are refused. `docker
+info` fails until the Docker unix socket is in `network.allowUnixSockets`, and that socket gives the host's Docker, so
+`srt` is no sandbox for Tickets that run containers. `sbx` needs an install and two browser logins by the Owner. Open
+for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` becomes the default.
