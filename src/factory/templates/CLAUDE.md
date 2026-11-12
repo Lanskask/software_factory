@@ -23,8 +23,9 @@ paste it again. The owner's standing answers are in `docs/OWNER-ANSWERS.md`: do 
 
 ## Protected
 
-Shared data no session may write, wipe or migrate (for example a dev database other people use). Empty until the owner
-fills it in.
+Shared data no session may write, wipe or migrate (for example a dev database other people use).
+
+{protected}
 
 ## End
 
