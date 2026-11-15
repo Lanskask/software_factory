@@ -1,0 +1,387 @@
+diff --git a/experiments/tt_interventions.py b/experiments/tt_interventions.py
+index 6f870ac..1a2113b 100644
+--- a/experiments/tt_interventions.py
++++ b/experiments/tt_interventions.py
+@@ -1,113 +1,20 @@
+-"""Count owner interventions in the terminal-task-tracker Claude Code transcripts.
++"""Count owner interventions in the terminal-task-tracker transcripts (the counter now lives in factory.retro).
+ 
+-Question: where did the owner have to step in while building terminal-task-tracker, and how often, so the
+-Factory knows what to automate? Input: every `*.jsonl` in the project's transcript folder (61 files, 2026-10-14 to
+-2026-11-12). A "message" is a top-level user turn that is typed text: no tool results, no meta, no slash-command
+-echoes, no `!` shell echoes. One message may carry several labels (owners send numbered lists).
+-
+-Answer (run 2026-11-12, see docs/factory-analysis.md): 311 typed messages. Biggest buckets: git/PR plumbing (91),
+-decisions (72), visual review (65), echoing the agent's own "skipped / not done" list back as an order (48), pasted
+-errors (43), relaying handoff docs (41).
+-
+-Labels are regex heuristics, so counts are approximate (about +/-10 % per bucket); read the examples it prints.
++Question: where did the owner have to step in while building terminal-task-tracker? Answer (run 2026-11-12, see
++docs/factory-analysis.md): 311 typed messages; biggest buckets git/PR plumbing (91), decisions (72), visual review
++(65), echoing the agent's skipped list (48), pasted errors (43), relaying handoffs (41). Counts are +/-10 %.
+ 
+ Usage: python3 -I experiments/tt_interventions.py [TRANSCRIPT_DIR]
+ """
+ 
+-import collections
+-import glob
+-import json
+-import os
+-import re
+ import sys
++from pathlib import Path
+ 
+-DIR = (
+-    sys.argv[1]
+-    if len(sys.argv) > 1
+-    else os.path.expanduser("~/.claude/projects/-Users-a1-Programming-My-Projects-terminal-task-tracker/")
+-)
+-
+-ECHO = re.compile(
+-    r"^(<task-notification|<local-command|<command-name>|<command-message>|Caveat:|\[Request interrupted"
+-    r"|<system-reminder|This session is being continued|<bash-input>|<bash-stdout>|/compact)"
+-)
+-
+-LABELS = {
+-    # session plumbing: the owner carries state between sessions by hand
+-    "handoff_relay": r"handoff (doc|is|document)|handoff-[\w-]+\.md|scratchpad/handoff",
+-    # owner pastes the agent's own skipped/not-done/unchecked list back and says "do it"
+-    "echo_skipped": r"(I (haven't|have not|did not|didn't)|Not done|Skipped|not checked|still unfixed|is not pushed"
+-    r"|Nothing pushed|Left alone)",
+-    # git / PR / CI choreography
+-    "git_pr": r"\b(push|PRs?\b|pull request|merge|stacked|branch|worktree|gh pr)",
+-    # external tracker mirroring (Linear, GitHub issues/projects)
+-    "tracker_sync": r"(linear|JOH-\d+|issues in GH|GH issues|github issues|Update Issues|tickets_to_issues"
+-    r"|Move new tickets to GH|Sync local closed tickets)",
+-    # owner pastes an error or failing output for the agent to solve
+-    "pasted_error": r"(error:|Error:|ERROR|--- FAIL|failed with|fatal:|HTTPError|Error \d)",
+-    # owner asks where we are / what is next / is it done
+-    "what_next": r"(what (to do|is|are) (next|left)|What is next|what next|What to do next|Next ticket|is .* finished"
+-    r"|Can we move to the next|what is left|what should be done)",
+-    # visual review against screenshots / Penpot boards
+-    "visual_review": r"\[Image #\d+\]|penpot|\bboards?\b",
+-    # owner answers a grill / option question or approves a proposal
+-    "decision": r"(\bq\d+\b|❓|I (agree|aggree|choose|prefer|approve)|option \(?[a-e]\)?|Agree with"
+-    r"|I like (the|this|variant)|looks good|Ok, np|yes,? (do|skip)|Consider .* approved)",
+-    # owner repeats a standing rule ("don't forget", "always", "remember")
+-    "repeat_rule": r"(don'?t forget|Remember that|Always |Don't be blind|You can run all commands|create a new branch"
+-    r"|Each ticket should have)",
+-    # owner widens scope mid-session (new epic/ticket/feature)
+-    "scope_add": r"(create (a new |an )?(epic|ticket)|Add (epic|a ticket)|create tickets|new epic|Create a ticket)",
+-    # owner unblocks autonomy ("do it yourself", "continue until the end", "fix all")
+-    "autonomy_grant": r"(do (all )?(changes|it|that) (youself|yourself)|make all changes yourself|continue all|Fix all!"
+-    r"|Do all designes|You can work on several|you can do anything|forget this limit)",
+-    # tool / plugin / harness setup (MCP, plugins, hooks, context size)
+-    "tooling_meta": r"\b(plugins?|MCP|hooks?|context window|ctx|tokens|reload-skills)\b",
+-}
+-LABELS = {k: re.compile(v, re.I) for k, v in LABELS.items()}
+-
+-
+-def messages():
+-    for f in sorted(glob.glob(os.path.join(DIR, "*.jsonl")), key=os.path.getmtime):
+-        sid = os.path.basename(f)[:8]
+-        with open(f) as fh:
+-            lines = fh.readlines()
+-        for line in lines:
+-            try:
+-                d = json.loads(line)
+-            except json.JSONDecodeError:
+-                continue
+-            if d.get("type") != "user" or d.get("isMeta") or d.get("isSidechain"):
+-                continue
+-            c = d.get("message", {}).get("content")
+-            parts = (
+-                [c]
+-                if isinstance(c, str)
+-                else [x.get("text", "") for x in c or [] if isinstance(x, dict) and x.get("type") == "text"]
+-            )
+-            for t in parts:
+-                t = t.strip()
+-                if t and not ECHO.match(t):
+-                    yield sid, d["timestamp"], t
+-
+-
+-def main():
+-    counts, examples, total = collections.Counter(), collections.defaultdict(list), 0
+-    for sid, ts, t in messages():
+-        total += 1
+-        for k, rx in LABELS.items():
+-            m = rx.search(t)
+-            if m:
+-                counts[k] += 1
+-                if len(examples[k]) < 3:
+-                    i = max(0, m.start() - 40)
+-                    examples[k].append(f"{sid} {ts[:10]}: …{t[i : i + 140]!r}")
+-    print(f"typed messages: {total}")
+-    for k, n in counts.most_common():
+-        print(f"{n:4d}  {k}")
+-        for e in examples[k]:
+-            print("        ", e)
+-
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
++from factory.retro import count, transcript_dir  # noqa: E402
+ 
+-if __name__ == "__main__":
+-    main()
++default = transcript_dir(Path.home() / "Programming/My_Projects/terminal-task-tracker")
++total, counts = count(Path(sys.argv[1]) if len(sys.argv) > 1 else default)
++print(f"typed messages: {total}")
++for k, n in counts.most_common():
++    print(f"{n:4d}  {k}")
+diff --git a/src/factory/cli.py b/src/factory/cli.py
+index 7a2097e..d2d1f16 100644
+--- a/src/factory/cli.py
++++ b/src/factory/cli.py
+@@ -12,6 +12,7 @@
+ from factory.bootstrap import branch_warning, copy_templates, next_step
+ from factory.config import Config, ConfigError, config_path, load_config, template
+ from factory.plan import Planner
++from factory.retro import retro
+ from factory.run import Factory
+ from factory.tracker import Tracker
+ 
+@@ -129,6 +130,9 @@ def main(argv: list[str] | None = None) -> int:
+     r.add_argument("--budget-usd", type=float, help="per implementation Session")
+     r.add_argument("--timeout-minutes", type=int, help="per Session")
+     sub.add_parser("status", help="Tickets, Blocked Tickets and loose ends").add_argument("project", type=Path)
++    sub.add_parser("retro", help="count the Owner's interventions, append a table to LESSONS.md").add_argument(
++        "project", type=Path
++    )
+     args = p.parse_args(argv)
+     if args.cmd == "install-skill":
+         return cmd_install_skill(args.dir)
+@@ -140,6 +144,9 @@ def main(argv: list[str] | None = None) -> int:
+             return cmd_bootstrap(project)
+         if args.cmd == "status":
+             return cmd_status(project)
++        if args.cmd == "retro":
++            print(f"✔ appended a retro table to {rel(retro(project))}")
++            return 0
+         if args.cmd == "plan" and not config_path(project).exists():
+             cmd_init(project)
+         cfg = load_config(project)
+diff --git a/src/factory/retro.py b/src/factory/retro.py
+new file mode 100644
+index 0000000..fd8c627
+--- /dev/null
++++ b/src/factory/retro.py
+@@ -0,0 +1,113 @@
++"""`factory retro PROJECT`: count the Owner's typed interventions in the Project's Claude Code transcripts and
++append a dated table to `.factory/LESSONS.md`.
++
++A "message" is a top-level user turn that is typed text: no tool results, no meta, no slash-command echoes, no `!`
++shell echoes. One message may carry several labels. Labels are regex heuristics: counts are approximate (about
+++/-10 % per bucket). See docs/factory-analysis.md section 3, P10.
++"""
++
++from __future__ import annotations
++
++import collections
++import json
++import re
++from collections.abc import Iterator
++from datetime import date
++from pathlib import Path
++
++ECHO = re.compile(
++    r"^(<task-notification|<local-command|<command-name>|<command-message>|Caveat:|\[Request interrupted"
++    r"|<system-reminder|This session is being continued|<bash-input>|<bash-stdout>|/compact)"
++)
++
++PATTERNS = {
++    # session plumbing: the owner carries state between sessions by hand
++    "handoff_relay": r"handoff (doc|is|document)|handoff-[\w-]+\.md|scratchpad/handoff",
++    # owner pastes the agent's own skipped/not-done/unchecked list back and says "do it"
++    "echo_skipped": r"(I (haven't|have not|did not|didn't)|Not done|Skipped|not checked|still unfixed|is not pushed"
++    r"|Nothing pushed|Left alone)",
++    # git / PR / CI choreography
++    "git_pr": r"\b(push|PRs?\b|pull request|merge|stacked|branch|worktree|gh pr)",
++    # external tracker mirroring (Linear, GitHub issues/projects)
++    "tracker_sync": r"(linear|JOH-\d+|issues in GH|GH issues|github issues|Update Issues|tickets_to_issues"
++    r"|Move new tickets to GH|Sync local closed tickets)",
++    # owner pastes an error or failing output for the agent to solve
++    "pasted_error": r"(error:|Error:|ERROR|--- FAIL|failed with|fatal:|HTTPError|Error \d)",
++    # owner asks where we are / what is next / is it done
++    "what_next": r"(what (to do|is|are) (next|left)|What is next|what next|What to do next|Next ticket|is .* finished"
++    r"|Can we move to the next|what is left|what should be done)",
++    # visual review against screenshots / Penpot boards
++    "visual_review": r"\[Image #\d+\]|penpot|\bboards?\b",
++    # owner answers a grill / option question or approves a proposal
++    "decision": r"(\bq\d+\b|❓|I (agree|aggree|choose|prefer|approve)|option \(?[a-e]\)?|Agree with"
++    r"|I like (the|this|variant)|looks good|Ok, np|yes,? (do|skip)|Consider .* approved)",
++    # owner repeats a standing rule ("don't forget", "always", "remember")
++    "repeat_rule": r"(don'?t forget|Remember that|Always |Don't be blind|You can run all commands|create a new branch"
++    r"|Each ticket should have)",
++    # owner widens scope mid-session (new epic/ticket/feature)
++    "scope_add": r"(create (a new |an )?(epic|ticket)|Add (epic|a ticket)|create tickets|new epic|Create a ticket)",
++    # owner unblocks autonomy ("do it yourself", "continue until the end", "fix all")
++    "autonomy_grant": r"(do (all )?(changes|it|that) (youself|yourself)|make all changes yourself|continue all|Fix all!"
++    r"|Do all designes|You can work on several|you can do anything|forget this limit)",
++    # tool / plugin / harness setup (MCP, plugins, hooks, context size)
++    "tooling_meta": r"\b(plugins?|MCP|hooks?|context window|ctx|tokens|reload-skills)\b",
++}
++LABELS = {k: re.compile(v, re.I) for k, v in PATTERNS.items()}
++
++
++def transcript_dir(project: Path) -> Path:
++    """Claude Code keeps a Project's transcripts in ~/.claude/projects/<absolute path, non-alphanumerics as `-`>."""
++    return Path.home() / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(project.resolve()))
++
++
++def messages(directory: Path) -> Iterator[str]:
++    for f in sorted(directory.glob("*.jsonl"), key=lambda p: p.stat().st_mtime):
++        for line in f.read_text().splitlines():
++            try:
++                d = json.loads(line)
++            except json.JSONDecodeError:
++                continue
++            if d.get("type") != "user" or d.get("isMeta") or d.get("isSidechain"):
++                continue
++            c = d.get("message", {}).get("content")
++            parts = (
++                [c]
++                if isinstance(c, str)
++                else [x.get("text", "") for x in c or [] if isinstance(x, dict) and x.get("type") == "text"]
++            )
++            for t in parts:
++                t = t.strip()
++                if t and not ECHO.match(t):
++                    yield t
++
++
++def count(directory: Path) -> tuple[int, collections.Counter[str]]:
++    counts: collections.Counter[str] = collections.Counter()
++    total = 0
++    for t in messages(directory):
++        total += 1
++        counts.update(k for k, rx in LABELS.items() if rx.search(t))
++    return total, counts
++
++
++ROW = re.compile(r"^- retro (\w+) \[open\] (\d+) of ")
++
++
++def retro(project: Path, directory: Path | None = None, today: date | None = None) -> Path:
++    """Append one `- retro BUCKET [open] ...` line per bucket to LESSONS.md (a Run keeps these lines).
++
++    An older [open] line of a bucket becomes [resolved] when the new count is lower: the bucket shrank.
++    """
++    total, counts = count(directory or transcript_dir(project))
++    path = project / ".factory" / "LESSONS.md"
++    if total == 0:  # no data is not a shrunk bucket: keep the old lines as they are
++        return path
++    path.parent.mkdir(parents=True, exist_ok=True)
++    kept = []
++    for ln in path.read_text().splitlines(keepends=True) if path.exists() else []:
++        m = ROW.match(ln)
++        kept.append(ln.replace("[open]", "[resolved]", 1) if m and counts.get(m[1], 0) < int(m[2]) else ln)
++    when = today or date.today()
++    new = [f"- retro {k} [open] {n} of {total} typed messages on {when}\n" for k, n in counts.most_common()]
++    path.write_text("".join(kept + new))
++    return path
+diff --git a/src/factory/run.py b/src/factory/run.py
+index 4b21bee..7a7c686 100644
+--- a/src/factory/run.py
++++ b/src/factory/run.py
+@@ -206,7 +206,7 @@ def run(self, *, dry_run: bool = False) -> int:
+             self.say(f"{e}. Stopping: fix the remote or gh, then run again.")
+             return 1
+         if not dry_run:  # lessons are per Run: a stale one would warn about a mistake the Owner already fixed
+-            (self.state / "LESSONS.md").unlink(missing_ok=True)
++            self.reset_lessons()
+         base = self.stack_tip()
+         if base != self.git("rev-parse", "--abbrev-ref", "HEAD"):
+             self.say(f"switching to {base}, the tip of the stack")
+@@ -291,6 +291,14 @@ def lessons(self) -> Path | None:
+         path = self.state / "LESSONS.md"
+         return path if path.exists() else None
+ 
++    def reset_lessons(self) -> None:
++        """Drop the Run's failure lessons but keep `factory retro` lines: they outlive a Run."""
++        path = self.state / "LESSONS.md"
++        if not path.exists():
++            return
++        keep = [ln for ln in path.read_text().splitlines(keepends=True) if ln.startswith("- retro ")]
++        path.write_text("".join(keep)) if keep else path.unlink()
++
+     def lesson(self, t: Ticket, what: str) -> None:
+         """One line per failure, read by every later Ticket's Session in this Run: a mistake is not made twice."""
+         with (self.state / "LESSONS.md").open("a") as f:
+diff --git a/tests/test_retro.py b/tests/test_retro.py
+new file mode 100644
+index 0000000..6c90760
+--- /dev/null
++++ b/tests/test_retro.py
+@@ -0,0 +1,72 @@
++"""`factory retro` counts typed Owner messages in a canned transcript and appends a dated table to LESSONS.md."""
++
++from __future__ import annotations
++
++import json
++from datetime import date
++from pathlib import Path
++
++import pytest
++
++from factory.cli import main
++from factory.retro import retro, transcript_dir
++
++
++def line(content: object, **kw: object) -> str:
++    return json.dumps({"type": "user", "timestamp": "2026-11-12T00:00:00Z", "message": {"content": content}, **kw})
++
++
++def test_retro_appends_dated_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    project = tmp_path / "proj"
++    project.mkdir()
++    monkeypatch.setattr(Path, "home", lambda: tmp_path)
++    tdir = transcript_dir(project)
++    tdir.mkdir(parents=True)
++    (tdir / "abcdefgh.jsonl").write_text(
++        "\n".join(
++            [
++                line("please push the branch and open a PR"),
++                line("error: boom, solve this"),
++                line([{"type": "tool_result", "content": "push"}]),
++                line("push", isMeta=True),
++                line("<system-reminder>push</system-reminder>"),
++                "not json",
++            ]
++        )
++    )
++    assert main(["retro", str(project)]) == 0
++    assert main(["retro", str(project)]) == 0
++    text = (project / ".factory" / "LESSONS.md").read_text()
++    assert f"- retro git_pr [open] 1 of 2 typed messages on {date.today()}" in text
++    assert "- retro pasted_error [open] 1 of 2" in text
++    assert text.count("- retro git_pr") == 2  # appends, never overwrites
++    assert all(ln.startswith("- retro ") for ln in text.splitlines())
++
++
++def test_retro_resolves_shrunk_bucket(tmp_path: Path) -> None:
++    (tmp_path / ".factory").mkdir()
++    (tmp_path / ".factory" / "LESSONS.md").write_text("- retro git_pr [open] 5 of 9 typed messages on 2026-01-01\n")
++    tdir = tmp_path / "t"
++    tdir.mkdir()
++    (tdir / "a.jsonl").write_text(line("hello"))
++    retro(tmp_path, tdir)
++    assert (tmp_path / ".factory" / "LESSONS.md").read_text().startswith("- retro git_pr [resolved] 5 of 9")
++
++
++def test_run_keeps_retro_lines(tmp_path: Path) -> None:
++    from factory.run import Factory
++
++    r = object.__new__(Factory)
++    r.state = tmp_path
++    (tmp_path / "LESSONS.md").write_text("- retro git_pr [open] 1 of 2 x\n- 3 slug [open] review FAIL y\n")
++    r.reset_lessons()
++    assert (tmp_path / "LESSONS.md").read_text() == "- retro git_pr [open] 1 of 2 x\n"
++
++
++def test_retro_without_transcripts_leaves_lessons_alone(tmp_path: Path) -> None:
++    lessons = tmp_path / ".factory" / "LESSONS.md"
++    lessons.parent.mkdir()
++    lessons.write_text("- retro X [open] 3 of 9 typed messages on 2026-01-01\n")
++    retro(tmp_path, directory=tmp_path / "no-such-folder")
++    assert "[open]" in lessons.read_text()
++    assert "[resolved]" not in lessons.read_text()
