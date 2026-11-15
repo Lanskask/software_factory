@@ -7,9 +7,9 @@ plugins, hooks) is absent unless mounted, and it is configured per repo in TypeS
 installed skills and work across Projects. Sandcastle's ideas (completion signal, idle timeout, branch strategy) are
 borrowed instead.
 
-## 2026-10-30 The Factory pushes and opens draft pull requests, never merges
+## 2026-10-30 The Factory pushes and opens pull requests, never merges
 
-Reason: owner's requirement. The Factory process runs `git push` and `gh pr create --draft`; the Session is denied push
+Reason: owner's requirement. The Factory process runs `git push` and `gh pr create`; the Session is denied push
 permission, so an agent cannot push work the Factory has not checked.
 
 ## 2026-10-30 A failed Ticket is marked Blocked and the Run continues
@@ -43,7 +43,7 @@ Reason: owner's requirement. No Spec: `/egm-bootstrap`, `/grill-with-docs`, `/to
 
 ## 2026-10-30 Linear branch stack, config in the Project, limits
 
-Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its draft PR targets it.
+Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its PR targets it.
 Project settings live in `<project>/.factory/config.toml`; Handoffs in git-ignored `.factory/handoffs/`. Defaults: 2
 Blocked Tickets stop a Run, $5 and 90 minutes per Session, 10 Tickets per Run.
 
@@ -190,7 +190,7 @@ fails, the Run stops, as it does mid-Run.
   Commits style).
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
   Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
-- The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
+- The PR is a standard (not draft) PR since 2026-11-14, see the entry below; it still never merges.
 
 ## 2026-11-12 Sandbox probe: `srt` works for `claude -p` and git; Docker needs the host socket; `sbx` not yet probed
 
@@ -199,3 +199,9 @@ Reason: measured result (`experiments/probe_sandbox.sh`, Issue #26). Under `srt`
 info` fails until the Docker unix socket is in `network.allowUnixSockets`, and that socket gives the host's Docker, so
 `srt` is no sandbox for Tickets that run containers. `sbx` needs an install and two browser logins by the Owner. Open
 for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` becomes the default.
+
+## 2026-11-14 The Factory opens standard pull requests, not drafts
+
+Reason: owner's requirement. Drafts hid the PRs from review tooling and needed a manual `gh pr ready` per PR. The Factory
+still never merges and the Session is still denied `gh` and `git push`, so the safety rule of the 2026-10-30 entry
+holds. There is no `draft` setting (YAGNI).

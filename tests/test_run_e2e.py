@@ -152,13 +152,14 @@ def claude_calls(p: Path) -> list[list[str]]:
     return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 
 
-def test_run_stacks_branches_pushes_and_opens_draft_prs(project: Path) -> None:
+def test_run_stacks_branches_pushes_and_opens_standard_prs(project: Path) -> None:
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
     assert factory(project).run() == 0
     assert git(project, "ls-remote", "--heads", "origin").count("refs/heads/factory/") == 2
     assert git(project, "merge-base", "--is-ancestor", "factory/01-a", "factory/02-b") == ""
     prs = gh_calls(project)
-    assert [c[:3] for c in prs] == [["pr", "create", "--draft"]] * 2
+    assert [c[:2] for c in prs] == [["pr", "create"]] * 2
+    assert all("--draft" not in c for c in prs)
     assert prs[0][prs[0].index("--base") + 1] == "main"
     assert prs[1][prs[1].index("--base") + 1] == "factory/01-a"
     assert all("merge" not in " ".join(c) for c in prs)

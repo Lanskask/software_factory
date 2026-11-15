@@ -49,9 +49,7 @@ def next_step(project: Path, cfg: Config) -> tuple[str, str]:
             return "Tickets are ready", f"factory run {project} --dry-run   # then without --dry-run"
         done = all(t.state == "done" for t in tickets)
         return (
-            ("All Tickets are done", "review the draft PRs")
-            if done
-            else ("Tickets are blocked", f"factory status {project}")
+            ("All Tickets are done", "review the PRs") if done else ("Tickets are blocked", f"factory status {project}")
         )
     if spec := find_spec(project):
         return f"A Spec exists ({spec}), no Tickets", f"factory plan {project} --spec {spec}"
