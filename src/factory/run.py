@@ -1,5 +1,5 @@
 """The Run: every Ready Ticket in turn, one fresh Session each, checked by the Factory and an independent reviewer
-before the Factory pushes it and opens a draft pull request. Nothing is ever merged."""
+before the Factory pushes it and opens a pull request. Nothing is ever merged."""
 
 from __future__ import annotations
 
@@ -362,7 +362,7 @@ class Factory:
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
         self.log_loose_ends(t, branch, handoff)  # before publishing: a failed push must not lose them
-        self.say(f"{t.num}: publishing, pushing {branch} and opening a draft pull request")
+        self.say(f"{t.num}: publishing, pushing {branch} and opening a pull request")
         self.publish(t.num, t.slug, base, branch, handoff, review_log)
         return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(handoff.read_text()))
 
@@ -436,15 +436,15 @@ class Factory:
                 raise PushError(f"{num}: git push of {b} failed: {push.stderr.strip()}")
         ticket = self.tracker.show(num)
         body = code_quote(
-            f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
+            f"Ticket {num} ({slug}), implemented by the Software Factory. Review before merging.\n\n"
             f"## Ticket\n\n{ticket}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
         )
         pr = subprocess.run(
-            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch,
+            [self.gh, "pr", "create", "--base", base, "--head", branch,
              "--title", pr_title(ticket, num, slug), "--body", body],
             cwd=self.project, capture_output=True, text=True,
         )  # fmt: skip
         if pr.returncode != 0:
             raise PushError(f"{num}: gh pr create failed: {pr.stderr.strip()}")
         pending.unlink()
-        self.say(f"{num}: draft pull request {pr.stdout.strip()}")
+        self.say(f"{num}: pull request {pr.stdout.strip()}")
