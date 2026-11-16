@@ -360,6 +360,14 @@ def test_low_loose_ends_become_backlog_tickets_at_the_end_of_a_run(
     assert "  - [ ] typo (from 02 b)\n" in out
 
 
+def test_low_loose_ends_are_filed_even_when_the_run_stops_early(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_HIGH", "02")
+    monkeypatch.setenv("FAKE_RESOLVE_FAIL", "1")
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b"}})
+    assert factory(project).run() == 1  # stops after 02: the resolver failed
+    assert "- [ ] typo (from 01 a)" in (project / ".factory" / "BACKLOG.md").read_text()
+
+
 def test_blocked_claim_on_a_verified_ticket_becomes_a_high_loose_end(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
