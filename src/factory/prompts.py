@@ -147,7 +147,9 @@ Read the Ticket with `{tk} show {ticket.num}`. {how}: Standards are this repo's 
 Ticket.{extra} Read the Handoff {handoff}: an item there that is actually inside this Ticket's scope is a finding.
 
 Report only must-fix findings: bugs, acceptance criteria without a test, security holes, mismatches with the Ticket.
-Not style. Number them, each with file and line. Your last line is exactly `VERDICT: PASS` or `VERDICT: FAIL`."""
+Not style. For each finding show the arithmetic or trace that proves it, ask "would a test fail if this branch were
+deleted?", and re-check it against the code before you write it down; drop what does not hold. Number them, each with
+file and line. Your last line is exactly `VERDICT: PASS` or `VERDICT: FAIL`."""
 
 
 _VERDICT = re.compile(r"^\W*VERDICT:\s*(PASS|FAIL)\W*$", re.M)

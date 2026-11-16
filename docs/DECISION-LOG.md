@@ -205,3 +205,10 @@ for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` b
 Reason: owner's requirement. Drafts hid the PRs from review tooling and needed a manual `gh pr ready` per PR. The Factory
 still never merges and the Session is still denied `gh` and `git push`, so the safety rule of the 2026-10-30 entry
 holds. There is no `draft` setting (YAGNI).
+
+## 2026-11-15 The reviewer prompt asks for proof, a deletion test and a re-check
+
+The blind review benchmark (`experiments/review-bench/judge-opus.md`) found that reviewers lost precision when they
+reported a finding without showing the arithmetic. `review_prompt` now asks for the arithmetic or trace, the question
+"would a test fail if this branch were deleted?", and a re-check of each finding before it is written. Source: measured
+result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
