@@ -64,6 +64,16 @@ def test_review_prompt_asks_for_a_verdict_against_the_base() -> None:
     p = review_prompt(T, "factory/10-12-x", "tk", Path("/h/now.md"), CFG)
     assert "factory/10-12-x" in p and "VERDICT: PASS" in p and "VERDICT: FAIL" in p
     assert "factory:code-review" in p
+    assert "arithmetic" in p and "deleted" in p and "re-check" in p
+
+
+def test_session_rules_ask_for_one_test_per_acceptance_criterion() -> None:
+    assert "one test per acceptance criterion" in session_rules(CFG, "tk")
+
+
+def test_review_prompt_fails_a_criterion_without_a_test() -> None:
+    p = review_prompt(T, "base", "tk", Path("/h/now.md"), CFG)
+    assert "every acceptance criterion has a test" in p and "VERDICT: FAIL" in p
 
 
 def test_session_rules_ask_for_one_test_per_acceptance_criterion() -> None:

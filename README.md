@@ -1,7 +1,7 @@
 # Software Factory
 
 Point it at a git Project. You plan with Claude once (Spec and Tickets); then the Factory implements every Ticket
-unattended, one fresh Claude Code session each, and opens a stacked draft pull request per Ticket. It never merges.
+unattended, one fresh Claude Code session each, and opens a stacked pull request per Ticket. It never merges.
 Terms are defined in [GLOSSARY.md](GLOSSARY.md), decisions and their reasons in
 [docs/DECISION-LOG.md](docs/DECISION-LOG.md).
 
@@ -47,7 +47,7 @@ unanswered ones once).
 3. The Factory checks for itself: Ticket done, clean tree, new commits, Handoff written, every `checks` command exits 0.
 4. Review Session, fresh, cannot edit files, may run the `checks`: `code-review` (plus `security-and-hardening` where it
    applies), ending in `VERDICT: PASS|FAIL`. A FAIL gets one fix Session and another review.
-5. The Factory runs `git push` and `gh pr create --draft`, with the previous Ticket's branch as the base.
+5. The Factory runs `git push` and `gh pr create`, with the previous Ticket's branch as the base.
 6. The Handoff is appended to `.factory/LOOSE-ENDS.md` (also for a Blocked Ticket, and before the push). A `[high]` item
    does not stop the Run: a read-only Session on `resolve_model` (default `opus`, with web research) decides what to do,
    its answer goes to `.factory/resolutions/` and `LOOSE-ENDS.md`, and the next Ticket's Session does the steps marked

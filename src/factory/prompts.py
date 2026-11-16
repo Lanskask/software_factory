@@ -150,7 +150,9 @@ Check that every acceptance criterion has a test that checks it; a criterion wit
 verdict is FAIL.
 
 Report only must-fix findings: bugs, acceptance criteria without a test, security holes, mismatches with the Ticket.
-Not style. Number them, each with file and line. Your last line is exactly `VERDICT: PASS` or `VERDICT: FAIL`."""
+Not style. For each finding show the arithmetic or trace that proves it, ask "would a test fail if this branch were
+deleted?", and re-check it against the code before you write it down; drop what does not hold. Number them, each with
+file and line. Your last line is exactly `VERDICT: PASS` or `VERDICT: FAIL`."""
 
 
 _VERDICT = re.compile(r"^\W*VERDICT:\s*(PASS|FAIL)\W*$", re.M)
