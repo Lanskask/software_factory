@@ -64,6 +64,7 @@ def test_review_prompt_asks_for_a_verdict_against_the_base() -> None:
     p = review_prompt(T, "factory/10-12-x", "tk", Path("/h/now.md"), CFG)
     assert "factory/10-12-x" in p and "VERDICT: PASS" in p and "VERDICT: FAIL" in p
     assert "factory:code-review" in p
+    assert "arithmetic" in p and "deleted" in p and "re-check" in p
 
 
 def test_parse_verdict() -> None:
