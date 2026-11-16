@@ -20,6 +20,7 @@ def test_protected_paths_become_edit_and_write_disallowed_entries(tmp_path: Path
     cmd = Factory(tmp_path, cfg, python=sys.executable).command("p", review=False, name="n")
     disallowed = cmd[cmd.index("--disallowedTools") + 1 :]
     assert "Edit(data/shared.db)" in disallowed and "Write(data/shared.db)" in disallowed
+    assert "Bash(git rm*data/shared.db*)" in disallowed and "Bash(git mv*data/shared.db*)" in disallowed
 
 
 def test_plan_bootstrap_session_denies_protected_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

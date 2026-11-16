@@ -109,7 +109,7 @@ class Planner:
             disallowed=(
                 "Bash(git push*)",
                 "Bash(git commit*)",
-                *(f"{tool}({p})" for p in self.cfg.protected for tool in ("Edit", "Write")),
+                *self.cfg.protected_denies(),
             ),
             budget_usd=3.0,
             model=self.cfg.model,

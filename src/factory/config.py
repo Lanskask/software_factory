@@ -24,7 +24,9 @@ class Config:
     base_branch: str = "main"
     branch_prefix: str = "factory/"
     allowed_tools: tuple[str, ...] = ()  # extra --allowedTools entries for implementation Sessions
-    protected: tuple[str, ...] = ()  # paths no Session may edit or write (shared data); also listed in the rules
+    protected: tuple[
+        str, ...
+    ] = ()  # paths no Session may edit, write, remove or move (shared data); listed in the rules
     skip_pattern: str = DEFAULT_SKIP
     model: str | None = None
     resolve_model: str = "opus"  # decides what to do about a [high] loose end, so the Run does not stop
@@ -41,6 +43,12 @@ class Config:
         "mattpocock-skills:diagnosing-bugs",
     )
     review_skills: tuple[str, ...] = ("mattpocock-skills:code-review", "agent-skills:security-and-hardening")
+
+    def protected_denies(self) -> tuple[str, ...]:
+        """--disallowedTools entries for `protected`: no edit, write, `git rm` or `git mv` of those paths."""
+        return tuple(
+            e for p in self.protected for e in (f"Edit({p})", f"Write({p})", f"Bash(git rm*{p}*)", f"Bash(git mv*{p}*)")
+        )
 
 
 def config_path(project: Path) -> Path:
@@ -119,7 +127,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # base_branch = "main"
 # branch_prefix = "factory/"
 {allowed}  # extra tools a Session may use without asking
-# protected = ["data/shared.db"]  # Sessions may not Edit or Write these paths
+# protected = ["data/shared.db"]  # Sessions may not Edit, Write, git rm or git mv these paths
 # skip_pattern = "{DEFAULT_SKIP}"
 # model = "opus"
 # resolve_model = "opus"     # the read-only Session that decides on a [high] loose end

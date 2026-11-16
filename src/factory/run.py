@@ -112,7 +112,7 @@ class Factory:
             else self.implement_tools(),
             disallowed=(*NEVER, "Edit", "Write", "NotebookEdit", "Bash(git commit*)")
             if review
-            else (*NEVER, *(f"{tool}({p})" for p in self.cfg.protected for tool in ("Edit", "Write"))),
+            else (*NEVER, *self.cfg.protected_denies()),
             budget_usd=self.cfg.review_budget_usd if review else self.cfg.budget_usd,
             model=self.cfg.resolve_model if resolve else self.cfg.model,
             plugin_dir=self.plugin_dir,
