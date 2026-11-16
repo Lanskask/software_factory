@@ -214,6 +214,7 @@ fails, the Run stops, as it does mid-Run.
   `.factory/interventions.md`. Reason: an honest count beats a guessed one.
 - `evals/new_run.sh` gives each run a local bare `origin` and a `gh` stand-in, so the Run publishes without GitHub.
 
+
 - The PR is a standard (not draft) PR since 2026-11-14, see the entry below; it still never merges.
 
 ## 2026-11-12 Sandbox probe: `srt` works for `claude -p` and git; Docker needs the host socket; `sbx` not yet probed

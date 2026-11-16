@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from factory.cli import main
-from factory.config import Config, load_config
-from factory.plan import Planner, chain, planning_rules
+from factory.config import DEFAULT_SKIP, Config, load_config
+from factory.plan import SPEC_SECTIONS, Planner, chain, planning_rules
 from factory.run import Factory
 
 CLAUDE_LOG = r"""
@@ -62,6 +63,23 @@ def test_planning_rules_start_with_the_owner_answers_interview() -> None:
 def test_planning_rules_ask_for_ears_acceptance_criteria() -> None:
     r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
     assert '"When X, the system shall Y"' in r and "/to-tickets" in r
+
+
+def test_spec_sections_template_has_alternatives_risks_and_deploy_preflight() -> None:
+    text = SPEC_SECTIONS.read_text()
+    for heading in ("## Alternatives", "## Risks", "## Deploy preflight"):
+        assert heading in text
+    preflight = text[text.index("## Deploy preflight") :]
+    for item in ("Billing", "quota project", "architecture", "State bucket", "Deletion protection", "make smoke"):
+        assert item in preflight
+
+
+def test_planning_rules_point_to_spec_at_the_sections_and_end_deploy_tickets_in_make_smoke() -> None:
+    r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
+    assert f"/to-spec includes the sections of {SPEC_SECTIONS}" in r
+    assert "every deploy Ticket's acceptance criteria end in `make smoke`" in r
+    deploy = next(bullet for bullet in r.split("\n- ") if "deploy Ticket" in bullet)
+    assert re.search(DEFAULT_SKIP, deploy, re.IGNORECASE)  # the Run skips it: deploy needs the Owner
 
 
 def test_plan_does_nothing_when_tickets_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
