@@ -59,6 +59,11 @@ def test_planning_rules_start_with_the_owner_answers_interview() -> None:
     assert "docs/OWNER-ANSWERS.md" in step0 and "interview.md" in step0 and "one batch" in step0
 
 
+def test_planning_rules_ask_for_ears_acceptance_criteria() -> None:
+    r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
+    assert '"When X, the system shall Y"' in r and "/to-tickets" in r
+
+
 def test_plan_does_nothing_when_tickets_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     exe = fake_claude(tmp_path, monkeypatch)
     proj = tmp_path / "p"

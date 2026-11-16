@@ -115,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     pl.add_argument("project", type=Path)
     pl.add_argument("--spec", type=Path, help="an existing Spec: skip the interview and the /to-spec step")
     pl.add_argument("--no-bootstrap", action="store_true", help="do not run /egm:egm-bootstrap unattended first")
-    r = sub.add_parser("run", help="implement the Ready Tickets unattended, one draft PR each")
+    r = sub.add_parser("run", help="implement the Ready Tickets unattended, one PR each")
     r.add_argument("project", type=Path)
     r.add_argument("--dry-run", action="store_true", help="print the next Ticket and its claude command, spend nothing")
     r.add_argument("--max-tickets", type=int)

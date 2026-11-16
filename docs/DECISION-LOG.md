@@ -7,9 +7,9 @@ plugins, hooks) is absent unless mounted, and it is configured per repo in TypeS
 installed skills and work across Projects. Sandcastle's ideas (completion signal, idle timeout, branch strategy) are
 borrowed instead.
 
-## 2026-10-30 The Factory pushes and opens draft pull requests, never merges
+## 2026-10-30 The Factory pushes and opens pull requests, never merges
 
-Reason: owner's requirement. The Factory process runs `git push` and `gh pr create --draft`; the Session is denied push
+Reason: owner's requirement. The Factory process runs `git push` and `gh pr create`; the Session is denied push
 permission, so an agent cannot push work the Factory has not checked.
 
 ## 2026-10-30 A failed Ticket is marked Blocked and the Run continues
@@ -43,7 +43,7 @@ Reason: owner's requirement. No Spec: `/egm-bootstrap`, `/grill-with-docs`, `/to
 
 ## 2026-10-30 Linear branch stack, config in the Project, limits
 
-Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its draft PR targets it.
+Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its PR targets it.
 Project settings live in `<project>/.factory/config.toml`; Handoffs in git-ignored `.factory/handoffs/`. Defaults: 2
 Blocked Tickets stop a Run, $5 and 90 minutes per Session, 10 Tickets per Run.
 
@@ -156,6 +156,15 @@ review of that Ticket PASSes (not when the fix Session's checks pass: the review
 Blocked lessons stay `[open]`. Other reasons from `verify()` (such as a crashed implement Session) are still recorded;
 telling them apart from code failures needs a typed reason. Not measured: whether it lowers the FAIL rate.
 
+## 2026-11-12 `checks` start as what CI runs; preflight warns about an unbuilt Dockerfile
+
+Reason: measured, in `docs/factory-analysis.md` (P4): at least 6 failures surfaced only on GitHub or at deploy because
+local checks were weaker than CI. `factory init` now copies the `make X` lines of `.github/workflows/*.yml` into
+`checks`, when X is a Makefile target, ahead of the known names (`test`, `lint`, ...). Targets named like `setup`,
+`install`, `deploy`, `release`, `publish` or `smoke` are left out: they install or ship, they do not check. When a
+`Dockerfile` exists and no check runs `docker` (directly or in its make recipe), `factory run` prints a warning and goes
+on: a refusal would stop Projects whose image is built only at deploy.
+
 ## 2026-11-12 `factory bootstrap` writes a rules `CLAUDE.md`, a handoff hook and the owner interview
 
 Reason: measured, in `docs/factory-analysis.md` (the owner's 311 typed messages while building terminal-task-tracker):
@@ -204,3 +213,26 @@ fails, the Run stops, as it does mid-Run.
 - Interventions cannot be seen in the logs, so the Owner writes one `- ` line per intervention into
   `.factory/interventions.md`. Reason: an honest count beats a guessed one.
 - `evals/new_run.sh` gives each run a local bare `origin` and a `gh` stand-in, so the Run publishes without GitHub.
+
+- The PR is a standard (not draft) PR since 2026-11-14, see the entry below; it still never merges.
+
+## 2026-11-12 Sandbox probe: `srt` works for `claude -p` and git; Docker needs the host socket; `sbx` not yet probed
+
+Reason: measured result (`experiments/probe_sandbox.sh`, Issue #26). Under `srt` 0.0.82, `claude -p` (about 10 s) and
+`git commit` work once `api.anthropic.com` is allowed and `~/.claude` is writable; writes elsewhere are refused. `docker
+info` fails until the Docker unix socket is in `network.allowUnixSockets`, and that socket gives the host's Docker, so
+`srt` is no sandbox for Tickets that run containers. `sbx` needs an install and two browser logins by the Owner. Open
+for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` becomes the default.
+
+## 2026-11-14 The Factory opens standard pull requests, not drafts
+
+Reason: owner's requirement. Drafts hid the PRs from review tooling and needed a manual `gh pr ready` per PR. The Factory
+still never merges and the Session is still denied `gh` and `git push`, so the safety rule of the 2026-10-30 entry
+holds. There is no `draft` setting (YAGNI).
+
+## 2026-11-15 The reviewer prompt asks for proof, a deletion test and a re-check
+
+The blind review benchmark (`experiments/review-bench/judge-opus.md`) found that reviewers lost precision when they
+reported a finding without showing the arithmetic. `review_prompt` now asks for the arithmetic or trace, the question
+"would a test fail if this branch were deleted?", and a re-check of each finding before it is written. Source: measured
+result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
