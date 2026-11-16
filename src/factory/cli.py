@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from factory.bootstrap import branch_warning, copy_templates, next_step
-from factory.config import ConfigError, config_path, load_config, template
+from factory.config import Config, ConfigError, config_path, load_config, template
 from factory.plan import Planner
 from factory.run import Factory
 from factory.tracker import Tracker
@@ -58,6 +58,11 @@ def commit(project: Path, paths: list[str], msg: str = "factory: config and .git
     print(f"✔ committed {', '.join(paths)}" if ok else f"factory: could not commit {', '.join(paths)}: do it yourself")
 
 
+def stage_line(project: Path, cfg: Config) -> str:
+    stage, command = next_step(rel(project), cfg)
+    return f"Stage: {stage}, Next: {command}"
+
+
 def cmd_bootstrap(project: Path) -> int:
     if written := copy_templates(project):
         print(f"✔ wrote {', '.join(written)}")
@@ -67,8 +72,7 @@ def cmd_bootstrap(project: Path) -> int:
     (project / cfg.tickets_dir).mkdir(parents=True, exist_ok=True)
     if warning := branch_warning(project, cfg):
         print(f"factory: {warning}")
-    stage, command = next_step(rel(project), cfg)
-    print(f"Stage: {stage}\nNext:  {command}")
+    print(stage_line(project, cfg))
     return 0
 
 
@@ -86,6 +90,7 @@ def cmd_status(project: Path) -> int:
     tracker = Tracker(project, cfg.tickets_dir)
     tickets = tracker.status() if tracker.exists() else []
     done = sum(t.state == "done" for t in tickets)
+    print(stage_line(project, cfg))
     print(f"Tickets: {done}/{len(tickets)} done")
     for t in tickets:
         print(f"  {t.num}\t{t.state}\t{'READY' if t.ready else ''}\t{t.slug}")
