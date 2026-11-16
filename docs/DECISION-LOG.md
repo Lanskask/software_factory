@@ -249,6 +249,7 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
   would land in that branch, not in `base_branch`. Later PRs of the stack are not retargeted after the bottom one merges.
 - If `gh pr merge` fails (auto-merge disabled in the repo, missing token scope), the Run prints a warning and goes on:
   the PR is already open, so nothing is lost and the publish is not retried.
+
 ## [low] loose ends become Backlog ticket lines in `.factory/BACKLOG.md` (2026-11-12)
 
 - At the end of a Run each `[low]` item of the Handoffs in `LOOSE-ENDS.md` becomes one `- [ ] <item> (from NN slug)`
