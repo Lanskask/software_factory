@@ -67,6 +67,14 @@ def test_retro_without_transcripts_leaves_lessons_alone(tmp_path: Path) -> None:
     lessons = tmp_path / ".factory" / "LESSONS.md"
     lessons.parent.mkdir()
     lessons.write_text("- retro X [open] 3 of 9 typed messages on 2026-01-01\n")
-    retro(tmp_path, directory=tmp_path / "no-such-folder")
+    assert retro(tmp_path, directory=tmp_path / "no-such-folder") is None
     assert "[open]" in lessons.read_text()
     assert "[resolved]" not in lessons.read_text()
+
+
+def test_cli_retro_without_transcripts_says_so_and_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("factory.cli.retro", lambda project: None)
+    assert main(["retro", str(tmp_path)]) == 1
+    assert "nothing was appended" in capsys.readouterr().out
