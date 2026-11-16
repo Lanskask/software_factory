@@ -145,7 +145,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "status":
             return cmd_status(project)
         if args.cmd == "retro":
-            print(f"✔ appended a retro table to {rel(retro(project))}")
+            path = retro(project)
+            if path is None:
+                print("no typed messages found for this project, so nothing was appended")
+                return 1
+            print(f"✔ appended a retro table to {rel(path)}")
             return 0
         if args.cmd == "plan" and not config_path(project).exists():
             cmd_init(project)

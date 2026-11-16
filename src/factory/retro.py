@@ -93,15 +93,16 @@ def count(directory: Path) -> tuple[int, collections.Counter[str]]:
 ROW = re.compile(r"^- retro (\w+) \[open\] (\d+) of ")
 
 
-def retro(project: Path, directory: Path | None = None, today: date | None = None) -> Path:
+def retro(project: Path, directory: Path | None = None, today: date | None = None) -> Path | None:
     """Append one `- retro BUCKET [open] ...` line per bucket to LESSONS.md (a Run keeps these lines).
 
+    Returns None, writing nothing, when there are no typed messages to count.
     An older [open] line of a bucket becomes [resolved] when the new count is lower: the bucket shrank.
     """
     total, counts = count(directory or transcript_dir(project))
     path = project / ".factory" / "LESSONS.md"
     if total == 0:  # no data is not a shrunk bucket: keep the old lines as they are
-        return path
+        return None
     path.parent.mkdir(parents=True, exist_ok=True)
     kept = []
     for ln in path.read_text().splitlines(keepends=True) if path.exists() else []:
