@@ -208,6 +208,14 @@ class Factory:
         return (handoff, resolved) if (resolved := self.resolve(tip, handoff)) else None
 
     def run(self, *, dry_run: bool = False) -> int:
+        logged_before = self.loose_ends_size()
+        try:
+            return self._run(dry_run=dry_run)
+        finally:  # every way out of a Run, early stops included, files the [low] loose ends
+            if filed := self.file_backlog(logged_before):
+                self.say(f"{filed} [low] loose ends filed as Backlog tickets in .factory/BACKLOG.md")
+
+    def _run(self, *, dry_run: bool) -> int:
         problem = self.preflight()
         if problem:
             self.say(problem)
@@ -230,7 +238,6 @@ class Factory:
             return 1
         previous, resolution = carried
         done, blocked = 0, 0
-        logged_before = self.loose_ends_size()
         for _ in range(self.cfg.max_tickets):
             ticket = self.next_ticket(skipped)
             if ticket is None:
@@ -265,8 +272,6 @@ class Factory:
                         f"{ticket.num}: [high] loose end, the resolver failed. Stopping: read .factory/LOOSE-ENDS.md"
                     )
                     return 1
-        if filed := self.file_backlog(logged_before):
-            self.say(f"{filed} [low] loose ends filed as Backlog tickets in .factory/BACKLOG.md")
         self.say(f"Run finished: {done} pull requests, {blocked} Blocked, ${self.cost:.2f} spent")
         return 1 if blocked else 0
 
