@@ -1,7 +1,8 @@
 # Software Factory
 
 Point it at a git Project. You plan with Claude once (Spec and Tickets); then the Factory implements every Ticket
-unattended, one fresh Claude Code session each, and opens a stacked draft pull request per Ticket. It never merges.
+unattended, one fresh Claude Code session each, and opens a stacked pull request per Ticket. It never merges,
+unless `merge = "green"` in `.factory/config.toml` turns on GitHub auto-merge for the bottom pull request of the stack.
 Terms are defined in [GLOSSARY.md](GLOSSARY.md), decisions and their reasons in
 [docs/DECISION-LOG.md](docs/DECISION-LOG.md).
 
@@ -47,7 +48,7 @@ unanswered ones once).
 3. The Factory checks for itself: Ticket done, clean tree, new commits, Handoff written, every `checks` command exits 0.
 4. Review Session, fresh, cannot edit files, may run the `checks`: `code-review` (plus `security-and-hardening` where it
    applies), ending in `VERDICT: PASS|FAIL`. A FAIL gets one fix Session and another review.
-5. The Factory runs `git push` and `gh pr create --draft`, with the previous Ticket's branch as the base.
+5. The Factory runs `git push` and `gh pr create`, with the previous Ticket's branch as the base.
 6. The Handoff is appended to `.factory/LOOSE-ENDS.md` (also for a Blocked Ticket, and before the push). A `[high]` item
    does not stop the Run: a read-only Session on `resolve_model` (default `opus`, with web research) decides what to do,
    its answer goes to `.factory/resolutions/` and `LOOSE-ENDS.md`, and the next Ticket's Session does the steps marked
@@ -80,3 +81,22 @@ make test       # fake claude and gh, real git: no money, no network
 make lint       # ruff and ty
 make probe      # re-run the paid print-mode probe (about $0.03)
 ```
+
+## Eval
+
+`evals/slugify-cli/` is a small fixture Project (a spec, 4 Tickets and 1 trap Ticket, `05-keep-case`, that contradicts
+the spec) to score a change to the Factory. The hidden acceptance tests in `evals/hidden/slugify-cli/` stay outside the
+fixture: `make eval-score` copies them into the run directory, runs them and removes them again.
+
+One repeat costs about $0.5 per Ticket, so about $2.5 per repeat. Run 3 repeats on haiku and 3 on sonnet:
+
+```bash
+make eval-new RUN=/tmp/eval-haiku-1 MODEL=haiku   # fixture as a git repo with a local origin and a gh stand-in
+PATH="/tmp/eval-haiku-1.bin:$PATH" factory run /tmp/eval-haiku-1   # paid
+make eval-score RUN=/tmp/eval-haiku-1             # one JSON line
+```
+
+Each time you step in during a Run (restart it, fix something by hand), append a `- what you did` line to
+`RUN/.factory/interventions.md`; the scorer counts those lines. The JSON line holds: `tickets`, `done`, `blocked`,
+`checks_green`, `hidden_passed`/`hidden_total`, `review_agreed`/`review_judged` (the trap should be FAIL or Blocked, the
+rest PASS), `cost_usd`, `minutes`, `sessions`, `fix_sessions` and `interventions`, read from `RUN/.factory/logs/`.

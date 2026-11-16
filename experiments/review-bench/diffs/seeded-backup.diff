@@ -1,0 +1,50 @@
+diff --git a/b/src/backup.py b/b/src/backup.py
+new file mode 100644
+index 0000000..135bf85
+--- /dev/null
++++ b/b/src/backup.py
+@@ -0,0 +1,26 @@
++"""Archive a project folder and keep only the newest backups."""
++
++import subprocess
++import time
++from pathlib import Path
++
++
++def make_backup(src: str, dest_dir: str) -> Path:
++    """Write <dest_dir>/<name>-<timestamp>.tar.gz and return its path."""
++    dest = Path(dest_dir) / f"{Path(src).name}-{int(time.time())}.tar.gz"
++    subprocess.run(f"tar czf {dest} -C {src} .", shell=True, check=True)
++    return dest
++
++
++def prune(dest_dir: str, keep: int) -> list[Path]:
++    """Delete all but the newest `keep` backups; return the deleted paths."""
++    files = sorted(Path(dest_dir).glob("*.tar.gz"), key=lambda p: p.stat().st_mtime)
++    old = files[: len(files) - keep + 1]
++    deleted = []
++    for f in old:
++        try:
++            f.unlink()
++            deleted.append(f)
++        except Exception:
++            pass
++    return deleted
+diff --git a/b/tests/test_backup.py b/b/tests/test_backup.py
+new file mode 100644
+index 0000000..fd1e741
+--- /dev/null
++++ b/b/tests/test_backup.py
+@@ -0,0 +1,12 @@
++from pathlib import Path
++
++from backup import make_backup
++
++
++def test_make_backup_creates_archive(tmp_path: Path) -> None:
++    src = tmp_path / "proj"
++    src.mkdir()
++    (src / "a.txt").write_text("hi")
++    out = tmp_path / "out"
++    out.mkdir()
++    assert make_backup(str(src), str(out)).exists()

@@ -61,3 +61,15 @@ def test_parse_stream_without_result_is_a_failure() -> None:
 def test_parse_stream_error_subtype_is_a_failure() -> None:
     r = parse_stream(json.dumps({"type": "result", "subtype": "error_max_budget_usd", "total_cost_usd": 5.0}))
     assert not r.ok and "error_max_budget_usd" in r.text
+
+
+def test_parse_stream_api_error_reports_its_message() -> None:
+    event = {"type": "result", "subtype": "success", "is_error": True, "result": "Credit balance is too low"}
+    r = parse_stream(json.dumps(event))
+    assert not r.ok and "Credit balance is too low" in r.text
+
+
+def test_parse_stream_usage_limit_is_rate_limited() -> None:
+    event = {"type": "result", "subtype": "success", "is_error": True, "api_error_status": 429, "result": "limit"}
+    r = parse_stream(json.dumps(event))
+    assert not r.ok and r.rate_limited

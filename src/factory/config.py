@@ -33,6 +33,7 @@ class Config:
     max_tickets: int = 10
     max_blocked: int = 2
     review_rounds: int = 2
+    merge: str = "never"  # "green": turn on GitHub auto-merge for the bottom PR of the stack after review PASS
     implement_skills: tuple[str, ...] = (
         "mattpocock-skills:implement",
         "mattpocock-skills:tdd",
@@ -65,6 +66,8 @@ def load_config(project: Path) -> Config:
             raise ConfigError(f"{path}: `{required}` is required")
     if not values["checks"]:
         raise ConfigError(f"{path}: `checks` needs at least one command")
+    if values.get("merge", "never") not in ("never", "green"):
+        raise ConfigError(f'{path}: `merge` must be "never" or "green"')
     try:
         re.compile(str(values.get("skip_pattern", DEFAULT_SKIP)))
     except re.error as e:
@@ -94,7 +97,15 @@ def template(project: Path) -> str:
     targets = re.findall(r"^([A-Za-z][\w-]*):", makefile.read_text(), re.M) if makefile.exists() else []
     # only these names: a target like web-dev starts a server that never exits
     names = ("test", "lint", "e2e", "web-test", "web-lint", "web-e2e")
-    checks = [f"make {t}" for t in names if t in targets] or ["make test"]
+    # checks = CI: the make targets the workflows run, except those that install or ship
+    ci = [
+        t
+        for wf in sorted((project / ".github" / "workflows").glob("*.y*ml"))
+        for t in re.findall(r"^\s*(?:-\s*)?(?:run:\s*\|?\s*)?make\s+([A-Za-z][\w-]*)", wf.read_text(), re.M)
+        if t in targets and not re.search(r"setup|install|deploy|release|publish|smoke", t)
+    ]
+    ordered = dict.fromkeys(ci + [t for t in names if t in targets])
+    checks = [f"make {t}" for t in ordered] or ["make test"]
     quoted = ", ".join(f'"{c}"' for c in checks)
     found = sorted((project / ".scratch").glob("**/tickets.py"))
     tickets_dir = found[0].parent.relative_to(project).as_posix() if found else f".scratch/{project.name}/tickets"
@@ -116,6 +127,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # max_tickets = 10           # per Run
 # max_blocked = 2            # Blocked Tickets that stop a Run
 # review_rounds = 2          # reviews per Ticket; each FAIL but the last gets a fix Session
+# merge = "never"            # "green": after review PASS, auto-merge the bottom pull request once CI is green
 # implement_skills = ["mattpocock-skills:implement", "mattpocock-skills:tdd", "mattpocock-skills:diagnosing-bugs"]
 # review_skills = ["mattpocock-skills:code-review", "agent-skills:security-and-hardening"]
 '''

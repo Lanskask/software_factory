@@ -45,6 +45,11 @@ def result(text, subtype="success"):
     print(json.dumps({"type": "result", "subtype": subtype, "result": text, "total_cost_usd": 0.5}))
     sys.exit(0)
 num = re.search(r"Ticket (\S+) ", prompt).group(1)
+if num in os.environ.get("FAKE_RATE_LIMIT", "").split(",") and not os.path.exists(f".limited-{num}"):
+    open(f".limited-{num}", "w").close()
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": True, "api_error_status": 429,
+                      "result": "You've hit your 5-hour limit", "total_cost_usd": 0}))
+    sys.exit(0)
 if "RESOLVE" in prompt:
     if os.environ.get("FAKE_RESOLVE_FAIL"):
         result("", subtype="error_max_turns")
@@ -81,6 +86,9 @@ result("DONE")
 FAKE_GH = r"""
 import json, os, sys
 with open(os.environ["FAKE_GH_LOG"], "a") as f: f.write(json.dumps(sys.argv[1:]) + "\n")
+if sys.argv[2] == "merge" and os.environ.get("FAKE_GH_MERGE_FAIL"):
+    print("auto-merge is not allowed for this repository", file=sys.stderr)
+    sys.exit(1)
 if os.environ.get("FAKE_GH_FAIL"):
     print("GraphQL: Base ref must be a branch", file=sys.stderr)
     sys.exit(1)
@@ -147,13 +155,14 @@ def claude_calls(p: Path) -> list[list[str]]:
     return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 
 
-def test_run_stacks_branches_pushes_and_opens_draft_prs(project: Path) -> None:
+def test_run_stacks_branches_pushes_and_opens_standard_prs(project: Path) -> None:
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
     assert factory(project).run() == 0
     assert git(project, "ls-remote", "--heads", "origin").count("refs/heads/factory/") == 2
     assert git(project, "merge-base", "--is-ancestor", "factory/01-a", "factory/02-b") == ""
     prs = gh_calls(project)
-    assert [c[:3] for c in prs] == [["pr", "create", "--draft"]] * 2
+    assert [c[:2] for c in prs] == [["pr", "create"]] * 2
+    assert all("--draft" not in c for c in prs)
     assert prs[0][prs[0].index("--base") + 1] == "main"
     assert prs[1][prs[1].index("--base") + 1] == "factory/01-a"
     assert all("merge" not in " ".join(c) for c in prs)
@@ -206,6 +215,19 @@ def test_run_stops_after_max_blocked(project: Path, monkeypatch: pytest.MonkeyPa
     assert factory(project, max_blocked=2).run() == 1
     assert gh_calls(project) == []
     assert not (project / ".factory" / "blocked" / "03.md").exists()
+
+
+def test_rate_limited_session_waits_and_runs_again_instead_of_blocking(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_RATE_LIMIT", "01")
+    with_tickets(project, {"01": {"slug": "a"}})
+    f = factory(project)
+    f.rate_limit_wait_s = 0
+    assert f.run() == 0
+    assert len(claude_calls(project)) == 3  # limited implement, implement again, review
+    assert not (project / ".factory" / "blocked" / "01.md").exists()
+    assert len(gh_calls(project)) == 1
 
 
 def test_review_fail_gets_one_fix_session_then_passes(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -391,3 +413,50 @@ def test_real_run_prints_the_next_line_and_the_stages_but_not_the_claude_command
 def test_review_session_may_run_the_configured_checks(project: Path) -> None:
     f = factory(project)
     assert "Bash(test -f t/tickets.json*)" in f.review_tools()
+
+
+def test_dockerfile_no_check_builds_warns_but_runs(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (project / "Dockerfile").write_text("FROM scratch\n")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project).run(dry_run=True) == 0
+    assert "no check builds the Dockerfile" in capsys.readouterr().out
+
+
+def test_dockerfile_built_by_a_make_check_does_not_warn(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (project / "Dockerfile").write_text("FROM scratch\n")
+    (project / "Makefile").write_text("image:\n\tdocker build -t x .\n")
+    with_tickets(project, {"01": {"slug": "a"}})
+    cfg = Config(tickets_dir="t", checks=("make image",), implement_skills=(), review_skills=())
+    assert Factory(project, cfg, python=sys.executable).run(dry_run=True) == 0
+    assert "Dockerfile" not in capsys.readouterr().out
+
+
+def test_merge_green_turns_on_auto_merge_only_for_the_pr_on_the_base_branch(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    assert factory(project, merge="green").run() == 0
+    calls = gh_calls(project)
+    assert [c[:2] for c in calls] == [["pr", "create"], ["pr", "merge"], ["pr", "create"]]
+    assert calls[1] == ["pr", "merge", "--auto", "--merge", "factory/01-a"]  # 02 stacks on 01-a: not merged
+
+
+def test_merge_never_does_not_merge(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, merge="never").run() == 0
+    assert [c[:2] for c in gh_calls(project)] == [["pr", "create"]]
+
+
+def test_merge_green_does_not_merge_after_review_fail(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_REVIEW_FAIL", "01")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, merge="green", review_rounds=1).run() == 1
+    assert gh_calls(project) == []
+
+
+def test_failed_auto_merge_warns_and_keeps_the_pr(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FAKE_GH_MERGE_FAIL", "1")
+    with_tickets(project, {"01": {"slug": "a"}})
+    assert factory(project, merge="green").run() == 0
+    assert "gh pr merge failed, not auto-merged: auto-merge is not allowed" in capsys.readouterr().out
+    assert not list((project / ".factory" / "unpublished").glob("*.json"))  # published, not retried

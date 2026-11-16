@@ -107,9 +107,12 @@ CFG = Config(tickets_dir="t", checks=())
 @pytest.mark.parametrize(
     "tickets, expected",
     [
-        ([tk("01", "done"), tk("02", "todo", True)], ("build (1/2 tickets)", "factory run P")),
+        (
+            [tk("01", "done"), tk("02", "todo", True)],
+            ("build (1/2 tickets)", "factory run P --dry-run   # then without --dry-run"),
+        ),
         ([tk("01", "done"), tk("02", "todo")], ("build (1/2 tickets), blocked", "factory status P")),
-        ([tk("01", "done")], ("verify (1/1 tickets)", "review the draft PRs")),
+        ([tk("01", "done")], ("verify (1/1 tickets)", "review the PRs")),
     ],
 )
 def test_next_step_with_tickets(

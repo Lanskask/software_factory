@@ -7,9 +7,9 @@ plugins, hooks) is absent unless mounted, and it is configured per repo in TypeS
 installed skills and work across Projects. Sandcastle's ideas (completion signal, idle timeout, branch strategy) are
 borrowed instead.
 
-## 2026-10-30 The Factory pushes and opens draft pull requests, never merges
+## 2026-10-30 The Factory pushes and opens pull requests, never merges
 
-Reason: owner's requirement. The Factory process runs `git push` and `gh pr create --draft`; the Session is denied push
+Reason: owner's requirement. The Factory process runs `git push` and `gh pr create`; the Session is denied push
 permission, so an agent cannot push work the Factory has not checked.
 
 ## 2026-10-30 A failed Ticket is marked Blocked and the Run continues
@@ -43,7 +43,7 @@ Reason: owner's requirement. No Spec: `/egm-bootstrap`, `/grill-with-docs`, `/to
 
 ## 2026-10-30 Linear branch stack, config in the Project, limits
 
-Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its draft PR targets it.
+Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its PR targets it.
 Project settings live in `<project>/.factory/config.toml`; Handoffs in git-ignored `.factory/handoffs/`. Defaults: 2
 Blocked Tickets stop a Run, $5 and 90 minutes per Session, 10 Tickets per Run.
 
@@ -156,6 +156,15 @@ review of that Ticket PASSes (not when the fix Session's checks pass: the review
 Blocked lessons stay `[open]`. Other reasons from `verify()` (such as a crashed implement Session) are still recorded;
 telling them apart from code failures needs a typed reason. Not measured: whether it lowers the FAIL rate.
 
+## 2026-11-12 `checks` start as what CI runs; preflight warns about an unbuilt Dockerfile
+
+Reason: measured, in `docs/factory-analysis.md` (P4): at least 6 failures surfaced only on GitHub or at deploy because
+local checks were weaker than CI. `factory init` now copies the `make X` lines of `.github/workflows/*.yml` into
+`checks`, when X is a Makefile target, ahead of the known names (`test`, `lint`, ...). Targets named like `setup`,
+`install`, `deploy`, `release`, `publish` or `smoke` are left out: they install or ship, they do not check. When a
+`Dockerfile` exists and no check runs `docker` (directly or in its make recipe), `factory run` prints a warning and goes
+on: a refusal would stop Projects whose image is built only at deploy.
+
 ## 2026-11-12 `factory bootstrap` writes a rules `CLAUDE.md`, a handoff hook and the owner interview
 
 Reason: measured, in `docs/factory-analysis.md` (the owner's 311 typed messages while building terminal-task-tracker):
@@ -202,3 +211,52 @@ fails, the Run stops, as it does mid-Run.
   `egm-review-loop` result, CI and PR state, review PASS, deploy (`make smoke`) and retro. A finished Project stays at
   `verify` until the Owner moves on. Reason: YAGNI; the Owner asked for the stage line, not new detectors.
 - `factory status` and `factory bootstrap` print the same line, `Stage: build (34/50 tickets), Next: factory run .`.
+
+## The eval scores a Run from its files, hidden tests come in only afterwards (2026-11-12)
+
+- The scorer (`factory.score`) reads only the run directory: Ticket states, `.factory/blocked/`, the result events of
+  `.factory/logs/*.jsonl` (cost, `duration_ms`, review verdicts) and the config's checks. Reason: the Factory already
+  writes all of it, so scoring needs no new hooks in the Run.
+- Hidden tests are copied in after the Run, run with the scorer's own pytest (the fixture is stdlib-only) and removed
+  again. `hidden_total` comes from `expected.json`, so a run whose code does not even import scores 0 of 15, not 0 of 1.
+- Review agreement: the trap Ticket should end FAIL or Blocked, every other reviewed Ticket PASS; Tickets the Run never
+  reached are not judged.
+- Interventions cannot be seen in the logs, so the Owner writes one `- ` line per intervention into
+  `.factory/interventions.md`. Reason: an honest count beats a guessed one.
+- `evals/new_run.sh` gives each run a local bare `origin` and a `gh` stand-in, so the Run publishes without GitHub.
+
+
+- The PR is a standard (not draft) PR since 2026-11-14, see the entry below; it still never merges.
+
+## 2026-11-12 Sandbox probe: `srt` works for `claude -p` and git; Docker needs the host socket; `sbx` not yet probed
+
+Reason: measured result (`experiments/probe_sandbox.sh`, Issue #26). Under `srt` 0.0.82, `claude -p` (about 10 s) and
+`git commit` work once `api.anthropic.com` is allowed and `~/.claude` is writable; writes elsewhere are refused. `docker
+info` fails until the Docker unix socket is in `network.allowUnixSockets`, and that socket gives the host's Docker, so
+`srt` is no sandbox for Tickets that run containers. `sbx` needs an install and two browser logins by the Owner. Open
+for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` becomes the default.
+
+## 2026-11-14 The Factory opens standard pull requests, not drafts
+
+Reason: owner's requirement. Drafts hid the PRs from review tooling and needed a manual `gh pr ready` per PR. The Factory
+still never merges and the Session is still denied `gh` and `git push`, so the safety rule of the 2026-10-30 entry
+holds. There is no `draft` setting (YAGNI).
+
+## 2026-11-15 The reviewer prompt asks for proof, a deletion test and a re-check
+
+The blind review benchmark (`experiments/review-bench/judge-opus.md`) found that reviewers lost precision when they
+reported a finding without showing the arithmetic. `review_prompt` now asks for the arithmetic or trace, the question
+"would a test fail if this branch were deleted?", and a re-check of each finding before it is written. Source: measured
+result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
+
+## Opt-in `merge = "green"` auto-merges the bottom of the stack (2026-11-12)
+
+- Default `merge = "never"` keeps the rule that the Factory never merges. Any other value than `never` or `green` is a
+  config error. Reason: Owner's requirement (docs/factory-analysis.md P8, issue #18).
+- With `green`, after review PASS and `gh pr create`, the Factory runs `gh pr merge --auto --merge` on the new PR, so
+  GitHub merges it once its required checks are green. (Since 2026-11-14 PRs are not drafts, so no `gh pr ready` step.)
+  Auto-merge needs required status checks on the base branch, else GitHub merges at once.
+- Only a PR whose base is `base_branch` is merged. A PR stacked on another factory branch is left open: merged, it
+  would land in that branch, not in `base_branch`. Later PRs of the stack are not retargeted after the bottom one merges.
+- If `gh pr merge` fails (auto-merge disabled in the repo, missing token scope), the Run prints a warning and goes on:
+  the PR is already open, so nothing is lost and the publish is not retried.

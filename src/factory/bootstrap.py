@@ -57,9 +57,9 @@ def next_step(project: Path, cfg: Config) -> tuple[str, str]:
         done = sum(t.state == "done" for t in tickets)
         count = f"({done}/{len(tickets)} tickets)"
         if done == len(tickets):
-            return f"verify {count}", "review the draft PRs"  # shortcut: PR and CI state unknown; no deploy or retro
+            return f"verify {count}", "review the PRs"  # shortcut: PR and CI state unknown; no deploy or retro
         if any(t.ready for t in tickets):
-            return f"build {count}", f"factory run {project}"
+            return f"build {count}", f"factory run {project} --dry-run   # then without --dry-run"
         return f"build {count}, blocked", f"factory status {project}"
     if spec := find_spec(project):
         return f"tickets (spec {spec})", f"factory plan {project} --spec {spec}"

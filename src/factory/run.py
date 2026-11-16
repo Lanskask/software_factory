@@ -1,5 +1,5 @@
 """The Run: every Ready Ticket in turn, one fresh Session each, checked by the Factory and an independent reviewer
-before the Factory pushes it and opens a draft pull request. Nothing is ever merged."""
+before the Factory pushes it and opens a pull request. Nothing is ever merged."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import re
 import shlex
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,6 +73,8 @@ class Factory:
         self.installed = installed
         self.plugin_dir: str | None = None
         self.cost = 0.0
+        self.rate_limit_wait_s = 15 * 60  # between tries of a rate-limited Session
+        self.rate_limit_max_s = 6 * 3600  # the subscription limit resets within 5 hours
 
     # --- small helpers -------------------------------------------------------------------------------------------
 
@@ -119,15 +122,22 @@ class Factory:
     def session(
         self, ticket: Ticket, kind: str, prompt: str, *, review: bool = False, resolve: bool = False
     ) -> SessionResult:
-        n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
-        log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
-        self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
-        name = f"factory {self.project.name} {ticket.num} {kind} {n}"
-        cmd = self.command(prompt, review=review, name=name, resolve=resolve)
-        res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
-        self.cost += res.cost_usd
-        self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
-        return res
+        waited = 0
+        while True:
+            n = len(list((self.state / "logs").glob(f"{ticket.file_key}-{kind}-*.jsonl"))) + 1
+            log = self.state / "logs" / f"{ticket.file_key}-{kind}-{n}.jsonl"
+            self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
+            name = f"factory {self.project.name} {ticket.num} {kind} {n}"
+            cmd = self.command(prompt, review=review, name=name, resolve=resolve)
+            res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
+            self.cost += res.cost_usd
+            self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
+            if not res.rate_limited or waited >= self.rate_limit_max_s:
+                return res
+            # a usage limit is not the Ticket's fault: blocking it would cost a rerun of everything done so far
+            self.say(f"{ticket.num}: {res.text}; running it again in {self.rate_limit_wait_s // 60} min")
+            time.sleep(self.rate_limit_wait_s)
+            waited += self.rate_limit_wait_s
 
     # --- the Run -------------------------------------------------------------------------------------------------
 
@@ -142,7 +152,20 @@ class Factory:
             return "`.factory/` is not git-ignored: run `factory init` or add `.factory/*` and `!.factory/config.toml`"
         if not self.tracker.exists():
             return f"no Tickets in {self.cfg.tickets_dir}: run `factory plan` first"
+        if (self.project / "Dockerfile").exists() and not self.checks_build_docker():
+            self.say("warning: no check builds the Dockerfile, so a broken image shows up only in CI or at deploy")
         return None
+
+    def checks_build_docker(self) -> bool:
+        """A check builds the image if it runs `docker` itself or is a `make` target whose recipe does."""
+        makefile = self.project / "Makefile"
+        text = makefile.read_text() if makefile.exists() else ""
+        for check in self.cfg.checks:
+            m = re.fullmatch(r"make\s+([\w-]+)", check.strip())
+            recipe = re.search(rf"^{re.escape(m[1])}:.*\n((?:\t.*\n?)*)", text, re.M) if m else None
+            if "docker" in check or (recipe and "docker" in recipe[1]):
+                return True
+        return False
 
     def next_ticket(self, skipped: set[str]) -> Ticket | None:
         blocked = self.blocked_keys()
@@ -352,7 +375,7 @@ class Factory:
             if problem:
                 return self.block(t, base, f"fix after review {round_}: {problem}")
         self.log_loose_ends(t, branch, handoff)  # before publishing: a failed push must not lose them
-        self.say(f"{t.num}: publishing, pushing {branch} and opening a draft pull request")
+        self.say(f"{t.num}: publishing, pushing {branch} and opening a pull request")
         self.publish(t.num, t.slug, base, branch, handoff, review_log)
         return Outcome(branch=branch, handoff=handoff, high=has_high_loose_end(handoff.read_text()))
 
@@ -426,15 +449,22 @@ class Factory:
                 raise PushError(f"{num}: git push of {b} failed: {push.stderr.strip()}")
         ticket = self.tracker.show(num)
         body = code_quote(
-            f"Ticket {num} ({slug}), implemented by the Software Factory. Draft: review before merging.\n\n"
+            f"Ticket {num} ({slug}), implemented by the Software Factory. Review before merging.\n\n"
             f"## Ticket\n\n{ticket}\n\n## Handoff\n\n{handoff.read_text()}\n\n## {review_log}\n"
         )
         pr = subprocess.run(
-            [self.gh, "pr", "create", "--draft", "--base", base, "--head", branch,
+            [self.gh, "pr", "create", "--base", base, "--head", branch,
              "--title", pr_title(ticket, num, slug), "--body", body],
             cwd=self.project, capture_output=True, text=True,
         )  # fmt: skip
         if pr.returncode != 0:
             raise PushError(f"{num}: gh pr create failed: {pr.stderr.strip()}")
         pending.unlink()
-        self.say(f"{num}: draft pull request {pr.stdout.strip()}")
+        self.say(f"{num}: pull request {pr.stdout.strip()}")
+        # publish() runs only after review PASS; a PR stacked on another branch would merge into that branch
+        if self.cfg.merge == "green" and base == self.cfg.base_branch:
+            gh = subprocess.run(
+                [self.gh, "pr", "merge", "--auto", "--merge", branch], cwd=self.project, capture_output=True, text=True
+            )
+            if gh.returncode != 0:  # the PR stays open for the Owner to merge by hand
+                self.say(f"{num}: warning: gh pr merge failed, not auto-merged: {gh.stderr.strip()}")

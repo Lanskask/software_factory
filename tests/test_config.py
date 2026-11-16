@@ -57,6 +57,20 @@ def test_config_defaults_are_a_valid_config() -> None:
     assert cfg.implement_skills and cfg.review_skills
 
 
+@pytest.mark.parametrize("value", ["never", "green"])
+def test_load_config_accepts_merge_never_and_green(tmp_path: Path, value: str) -> None:
+    write(tmp_path, f'tickets_dir = "t"\nchecks = ["make test"]\nmerge = "{value}"\n')
+    assert load_config(tmp_path).merge == value
+
+
+def test_merge_defaults_to_never_and_rejects_other_values(tmp_path: Path) -> None:
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["make test"]\n')
+    assert load_config(tmp_path).merge == "never"
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["make test"]\nmerge = "always"\n')
+    with pytest.raises(ConfigError, match="merge"):
+        load_config(tmp_path)
+
+
 def test_template_finds_the_existing_tickets_folder_under_scratch(tmp_path: Path) -> None:
     (tmp_path / ".scratch" / "task-tracker" / "issues").mkdir(parents=True)
     (tmp_path / ".scratch" / "task-tracker" / "issues" / "tickets.py").write_text("")
@@ -79,3 +93,18 @@ def test_template_adds_web_checks_and_bun_when_the_project_has_a_web_app(tmp_pat
 def test_template_leaves_allowed_tools_empty_without_a_web_app(tmp_path: Path) -> None:
     write(tmp_path, template(tmp_path))
     assert load_config(tmp_path).allowed_tools == ()
+
+
+def test_template_copies_the_make_targets_ci_runs_into_checks(tmp_path: Path) -> None:
+    makefile = "setup:\n\tuv sync\ntest:\n\tpytest\nlint:\n\truff\ntypecheck:\n\tty\ndeploy:\n\tfly deploy\n"
+    (tmp_path / "Makefile").write_text(makefile)
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "jobs:\n  check:\n    steps:\n      - run: make setup\n      - run: make typecheck # make sure types hold\n"
+        "      - run: |\n          make lint\n          make test\n"
+    )
+    (workflows / "deploy.yml").write_text("      - run: make deploy\n")
+    write(tmp_path, template(tmp_path))
+    # setup installs and deploy ships: neither is a check; "make sure" in a comment is not a target
+    assert load_config(tmp_path).checks == ("make typecheck", "make lint", "make test")

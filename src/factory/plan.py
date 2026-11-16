@@ -42,6 +42,7 @@ def chain(*, spec: bool) -> tuple[str, ...]:
 
 PLANNING_SKILLS = (BOOTSTRAP, *chain(spec=False))
 INTERVIEW = TEMPLATES / "interview.md"
+SPEC_SECTIONS = TEMPLATES / "spec-sections.md"
 
 
 def planning_rules(cfg: Config, spec: Path | None, steps: tuple[str, ...]) -> str:
@@ -59,11 +60,16 @@ and tell the Owner which step you are on:
 {numbered}
 
 Rules for the result
+- /to-spec includes the sections of {SPEC_SECTIONS} in the Spec: Alternatives, Risks and Deploy preflight.
+- every deploy Ticket's acceptance criteria end in `make smoke` passing against the live URL, and a deploy Ticket
+  says "Owner's go-ahead".
 - The issue tracker is local files. /to-tickets writes the Tickets with its tickets.py into `{cfg.tickets_dir}`
   exactly, not into another .scratch directory.
 - After Planning, every Ticket is implemented unattended: one Session each, about ${cfg.budget_usd:.0f} and
   {cfg.timeout_minutes} minutes. Keep Tickets small and clear, with acceptance criteria a test can check, and resolve
   every open question now: no Session can ask the Owner.
+- /to-tickets writes every acceptance criterion in EARS form, "When X, the system shall Y", so each one maps to one
+  test.
 - A Ticket that needs the Owner (a go-ahead, cloud resources, money, credentials) says "Owner's go-ahead" in its text,
   so the Run skips it.
 - At the end, commit the Spec, the docs and the Tickets on the current branch, and tell the Owner to run
