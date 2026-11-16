@@ -83,27 +83,33 @@ def branch_warning(project: Path, cfg: Config) -> str | None:
     return None
 
 
-def run_command(cmd: list[str], cwd: Path) -> str:
-    """Output (stdout and stderr) of `cmd` run in `cwd`; empty when it cannot run or hangs."""
+def run_command(cmd: list[str], cwd: Path) -> str | None:
+    """Output (stdout and stderr) of `cmd` run in `cwd`; None when it cannot run or hangs."""
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=cwd)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=cwd)
     except (OSError, subprocess.TimeoutExpired):
-        return ""
+        return None
     return r.stdout + r.stderr
 
 
-def doctor(project: Path, run: Callable[[list[str], Path], str] = run_command) -> str:
-    """One line: MCP servers connected, gh scopes (repo, project) and whether the token can merge."""
-    mcp = [ln for ln in run(["claude", "mcp", "list"], project).splitlines() if " - " in ln]
-    up = sum("Connected" in ln and "Failed" not in ln for ln in mcp)
+def doctor(project: Path, run: Callable[[list[str], Path], str | None] = run_command) -> str:
+    """One line: MCP servers connected, gh scopes (repo, project) and whether the token can merge.
+
+    A command that cannot run or hangs gives "unknown", never a guessed "0 up" or "missing".
+    """
+    out = run(["claude", "mcp", "list"], project)
+    mcp = [ln for ln in (out or "").splitlines() if " - " in ln]
+    mcp_text = (
+        "unknown" if out is None else f"{sum('Connected' in ln and 'Failed' not in ln for ln in mcp)}/{len(mcp)} up"
+    )
     auth = run(["gh", "auth", "status"], project)
-    scopes = re.search(r"Token scopes: (.*)", auth)
+    scopes = re.search(r"Token scopes: (.*)", auth or "")
     have = set(re.findall(r"[\w:-]+", scopes[1])) if scopes else set()
     missing = [s for s in ("repo", "project") if s not in have]
     # fine-grained and GH_TOKEN logins print no scopes line: that is "unknown", not "missing"
-    unknown = not scopes and "Logged in to" in auth
-    perm = run(["gh", "repo", "view", "--json", "viewerPermission", "-q", ".viewerPermission"], project).strip()
+    unknown = auth is None or (not scopes and "Logged in to" in auth)
+    perm = run(["gh", "repo", "view", "--json", "viewerPermission", "-q", ".viewerPermission"], project)
     # shortcut: viewerPermission is the user's repo role; branch protection rules are not checked
-    merge = "yes" if perm in ("ADMIN", "MAINTAIN", "WRITE") else "no"
+    merge = "unknown" if perm is None else "yes" if perm.strip() in ("ADMIN", "MAINTAIN", "WRITE") else "no"
     gh = "unknown" if unknown else "ok" if not missing else f"missing {', '.join(missing)}"
-    return f"Doctor: MCP {up}/{len(mcp)} up, gh scopes {gh}, can merge: {merge}"
+    return f"Doctor: MCP {mcp_text}, gh scopes {gh}, can merge: {merge}"

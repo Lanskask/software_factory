@@ -13,7 +13,7 @@ MCP = "Checking MCP server health...\n\na: npx a - ✓ Connected\nb: npx b - ✗
 AUTH = "github.com\n  - Token scopes: 'gist', 'project', 'repo'\n"
 
 
-def fake(mcp: str = MCP, auth: str = AUTH, perm: str = "WRITE\n") -> Callable[[list[str], Path], str]:
+def fake(mcp: str = MCP, auth: str = AUTH, perm: str = "WRITE\n") -> Callable[[list[str], Path], str | None]:
     out = {"mcp": mcp, "auth": auth, "repo": perm}
     return lambda cmd, cwd: out[cmd[1] if cmd[0] == "gh" else "mcp"]
 
@@ -37,15 +37,15 @@ def test_status_prints_doctor_line(
     assert "Doctor: stub line" in capsys.readouterr().out.splitlines()
 
 
-def test_tools_absent() -> None:
-    line = doctor(Path("."), lambda cmd, cwd: "")
-    assert line == "Doctor: MCP 0/0 up, gh scopes missing repo, project, can merge: no"
+def test_tools_absent_or_hanging_is_unknown_not_a_false_alarm() -> None:
+    line = doctor(Path("."), lambda cmd, cwd: None)
+    assert line == "Doctor: MCP unknown, gh scopes unknown, can merge: unknown"
 
 
 def test_gh_repo_view_runs_in_the_project_directory(tmp_path: Path) -> None:
     seen: dict[str, Path] = {}
 
-    def run(cmd: list[str], cwd: Path) -> str:
+    def run(cmd: list[str], cwd: Path) -> str | None:
         seen[cmd[1]] = cwd
         return fake()(cmd, cwd)
 
