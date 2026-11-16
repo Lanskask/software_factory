@@ -270,3 +270,12 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
   up by the next unattended Run. The Owner promotes or drops them after reading `factory status`.
 - Only what this Run appended to `LOOSE-ENDS.md` is filed, and a line already in the file is not written again: a line
   the Owner deletes stays deleted. Items in a resolver's decision are skipped: they are not Handoff items.
+
+## `commit()` keeps `git add -f` (2026-11-12)
+
+- `commit()` runs `git add -f -- <paths>` and `git commit -- <paths>`. The paths are the exact files the Factory just
+  wrote (`CLAUDE.md`, `.claude/settings.json`, `docs/OWNER-ANSWERS.md`, `.factory/config.toml`, `.gitignore`); no
+  directory, glob or `-A`, so `-f` can add nothing else. Both calls take the same pathspec, so other staged files stay out.
+- Kept, because the Owner's global gitignore has `.claude/` and without `-f` the shared `.claude/settings.json` would
+  never be committed. The one file a Project ignores on purpose and the Factory still writes is `.claude/settings.json`.
+- `tests/test_commit.py` pins it: under an ignore rule only the named file is committed. Closes #25.
