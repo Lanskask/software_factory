@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from factory.config import Config
@@ -80,3 +81,35 @@ def branch_warning(project: Path, cfg: Config) -> str | None:
     if branch != cfg.base_branch:
         return f"on branch {branch}, but base_branch is {cfg.base_branch}: switch, or set base_branch in config.toml"
     return None
+
+
+def run_command(cmd: list[str], cwd: Path) -> str | None:
+    """Output (stdout and stderr) of `cmd` run in `cwd`; None when it cannot run or hangs."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=cwd)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout + r.stderr
+
+
+def doctor(project: Path, run: Callable[[list[str], Path], str | None] = run_command) -> str:
+    """One line: MCP servers connected, gh scopes (repo, project) and whether the token can merge.
+
+    A command that cannot run or hangs gives "unknown", never a guessed "0 up" or "missing".
+    """
+    out = run(["claude", "mcp", "list"], project)
+    mcp = [ln for ln in (out or "").splitlines() if " - " in ln]
+    mcp_text = (
+        "unknown" if out is None else f"{sum('Connected' in ln and 'Failed' not in ln for ln in mcp)}/{len(mcp)} up"
+    )
+    auth = run(["gh", "auth", "status"], project)
+    scopes = re.search(r"Token scopes: (.*)", auth or "")
+    have = set(re.findall(r"[\w:-]+", scopes[1])) if scopes else set()
+    missing = [s for s in ("repo", "project") if s not in have]
+    # fine-grained and GH_TOKEN logins print no scopes line: that is "unknown", not "missing"
+    unknown = auth is None or (not scopes and "Logged in to" in auth)
+    perm = run(["gh", "repo", "view", "--json", "viewerPermission", "-q", ".viewerPermission"], project)
+    # shortcut: viewerPermission is the user's repo role; branch protection rules are not checked
+    merge = "unknown" if perm is None else "yes" if perm.strip() in ("ADMIN", "MAINTAIN", "WRITE") else "no"
+    gh = "unknown" if unknown else "ok" if not missing else f"missing {', '.join(missing)}"
+    return f"Doctor: MCP {mcp_text}, gh scopes {gh}, can merge: {merge}"
