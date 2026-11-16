@@ -19,8 +19,10 @@ PROJECT_FILES = {
 }
 
 
-def copy_templates(project: Path) -> list[str]:
-    """Copy each template the Project lacks; return the Project paths written."""
+def copy_templates(project: Path, protected: tuple[str, ...] = ()) -> list[str]:
+    """Copy each template the Project lacks, filling the Protected section from `protected`; return paths written."""
+    empty = "Empty until the owner fills in `protected` in `.factory/config.toml`."
+    section = "\n".join(f"- `{p}`" for p in protected) or empty
     written = []
     for target, name in PROJECT_FILES.items():
         dest = project / target
@@ -29,7 +31,7 @@ def copy_templates(project: Path) -> list[str]:
                 print(f"factory: CLAUDE.md exists: the rules template was not applied (see {TEMPLATES / name})")
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text((TEMPLATES / name).read_text())
+        dest.write_text((TEMPLATES / name).read_text().replace("{protected}", section))
         written.append(target)
     return written
 

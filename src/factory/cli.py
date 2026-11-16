@@ -64,7 +64,8 @@ def stage_line(project: Path, cfg: Config) -> str:
 
 
 def cmd_bootstrap(project: Path) -> int:
-    if written := copy_templates(project):
+    protected = load_config(project).protected if config_path(project).exists() else ()
+    if written := copy_templates(project, protected):
         print(f"✔ wrote {', '.join(written)}")
         commit(project, written, "factory: project rules, settings and owner-answers templates")
     cmd_init(project)

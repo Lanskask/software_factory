@@ -106,7 +106,11 @@ class Planner:
             f"/{BOOTSTRAP}",
             system="",
             allowed=BOOTSTRAP_TOOLS,
-            disallowed=("Bash(git push*)", "Bash(git commit*)"),
+            disallowed=(
+                "Bash(git push*)",
+                "Bash(git commit*)",
+                *self.cfg.protected_denies(),
+            ),
             budget_usd=3.0,
             model=self.cfg.model,
             plugin_dir=None,
