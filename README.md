@@ -53,6 +53,8 @@ unanswered ones once).
    does not stop the Run: a read-only Session on `resolve_model` (default `opus`, with web research) decides what to do,
    its answer goes to `.factory/resolutions/` and `LOOSE-ENDS.md`, and the next Ticket's Session does the steps marked
    `NOW` first. If the resolver itself fails, the Run stops.
+7. At the end of the Run each `[low]` item becomes one Backlog ticket line in `.factory/BACKLOG.md` (a plain file write,
+   no Session, never filed twice). `factory status` lists them as one list, so the Owner tickets all or drops them.
 
 A Session's BLOCKED claim does not override the checks: if the Ticket is done and every check passes, the claim becomes
 a `[high]` loose end instead. Sessions load no MCP servers (`--strict-mcp-config`).
