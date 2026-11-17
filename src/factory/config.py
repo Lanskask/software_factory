@@ -39,6 +39,7 @@ class Config:
     services: str = ""  # shell command that starts local stand-ins (e.g. `docker compose up -d --wait`) before a Run
     services_down: str = "docker compose down"  # runs after a Run that started `services`, even a failed one
     env: dict[str, str] = field(default_factory=dict)  # `[env]` table: set for every Session and check
+    design: bool = False  # add the design step to Planning and the `design` stage to `factory status`
     merge: str = "never"  # "green": turn on GitHub auto-merge for the bottom PR of the stack after review PASS
     implement_skills: tuple[str, ...] = (
         "mattpocock-skills:implement",
@@ -147,6 +148,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # services = "docker compose up -d --wait"  # local stand-ins, started once before the first Ticket
 # services_down = "docker compose down"      # stopped after the Run, also when it fails
 # [env]                      # set for every Session and check, e.g. FIRESTORE_EMULATOR_HOST = "localhost:8080"
+# design = false             # true: Planning adds a design step; UI Tickets then need a `Design:` line
 # merge = "never"            # "green": after review PASS, auto-merge the bottom pull request once CI is green
 # implement_skills = ["mattpocock-skills:implement", "mattpocock-skills:tdd", "mattpocock-skills:diagnosing-bugs"]
 # review_skills = ["mattpocock-skills:code-review", "agent-skills:security-and-hardening"]

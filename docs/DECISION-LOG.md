@@ -287,3 +287,14 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
   the end of every Run that started `services`, including a failed start and an early stop.
 - `[env]` is a table of strings added to the environment of every Session and every check. Per plan step 3 of
   `docs/plan-local-stack-and-sandbox.md`; the stand-ins cannot emulate IAM, so the real dev deploy stays. Closes #28.
+
+## The design stage is a Planning step switched on by `design = true` (2026-11-17)
+
+- `chain(design=True)` appends a `design` step after `/to-tickets`. It is not a skill: the Planning rules tell the
+  session to follow `templates/design-checklist.md` and add a `Design: <approved board>` line to every UI Ticket.
+  The step runs last because it edits Tickets, which exist only after `/to-tickets`.
+- It is a config key, not read from interview Q7, so the Factory never parses free-text answers (the Owner's
+  requirement: P6 in `docs/factory-analysis.md`, from three handoffs that asked for design-page deviations).
+- Exit check: `factory status` shows stage `design (N UI without a Design: line)` until each UI Ticket has the line.
+  A Ticket counts as UI when its text has a word like page, screen, button, hotkey or form: a keyword guess, which
+  can show a false stage (fix: add the `Design:` line, even `Design: none, no visual change`). Closes #16.

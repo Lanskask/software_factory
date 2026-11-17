@@ -40,6 +40,10 @@ first folder under `.scratch/` that holds a `tickets.py` (any name, such as `tic
 `.factory/handoffs/latest.md`) and `docs/OWNER-ANSWERS.md` (the owner questions with defaults; `plan` asks the
 unanswered ones once).
 
+With `design = true` in `.factory/config.toml`, Planning ends with a design step that follows
+`src/factory/templates/design-checklist.md` and gives every UI Ticket a `Design:` line; `factory status` shows stage
+`design` until they all have one.
+
 ## What a Run does per Ticket
 
 1. Branch `factory/<num>-<slug>` from the last Ticket that reached a pull request (or the current branch).
