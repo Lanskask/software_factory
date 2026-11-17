@@ -43,9 +43,9 @@ Reason: owner's requirement. No Spec: `/egm-bootstrap`, `/grill-with-docs`, `/to
 
 ## 2026-10-30 Linear branch stack, config in the Project, limits
 
-Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its PR targets it.
-Project settings live in `<project>/.factory/config.toml`; Handoffs in git-ignored `.factory/handoffs/`. Defaults: 2
-Blocked Tickets stop a Run, $5 and 90 minutes per Session, 10 Tickets per Run.
+Reason: owner's requirement. Each Ticket branches from the last done Ticket's branch and its PR targets it. Project
+settings live in `<project>/.factory/config.toml`; Handoffs in git-ignored `.factory/handoffs/`. Defaults: 2 Blocked
+Tickets stop a Run, $5 and 90 minutes per Session, 10 Tickets per Run.
 
 ## 2026-10-30 User-only skills become model-invocable inside Factory sessions only
 
@@ -195,18 +195,20 @@ fails, the Run stops, as it does mid-Run.
 ## PR title is `type: [NN] Ticket title`, code in the body is backticked (2026-10-31)
 
 - Title: `feat: [08] Page changes for Hosted mode`, taken from the Ticket's `# NN: title` heading. The type is the
-  Ticket's optional `**Type:**` line (`test`, `docs`, ...), default `feat`. Reason: the Owner's requirement (Conventional
-  Commits style).
+  Ticket's optional `**Type:**` line (`test`, `docs`, ...), default `feat`. Reason: the Owner's requirement
+  (Conventional Commits style).
 - Body: test ids and file paths are wrapped in backticks by `code_quote` (outside code fences and spans), because the
-  Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`. A heuristic, not a parser.
-- The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It never merges").
+  Sessions write them bare. Commands are wrapped too: `make` with a known target (not "make sure"), `uv run X`, `uvx X`.
+  A heuristic, not a parser.
+- The PR stays a draft: the Factory never marks one ready for review (README: "stacked draft pull request per Ticket. It
+  never merges").
 
 ## The stage line is coarse: idea, answers, spec, tickets, build, verify (2026-11-12)
 
 - `next_step()` follows the P9 stage table of `docs/factory-analysis.md` as far as the Factory has data. Idea: no
-  `docs/IDEA.md`. Answers: `IDEA.md` exists but Q1 of `docs/OWNER-ANSWERS.md` has no Answer (the only question without
-  a default; the table asks Q1 to Q7 and Q12). Spec: Q1 answered, no spec file. Tickets: a spec file, no Tickets.
-  Build: Tickets exist and some are not done, shown as `(done/total tickets)`. Verify: every Ticket is done.
+  `docs/IDEA.md`. Answers: `IDEA.md` exists but Q1 of `docs/OWNER-ANSWERS.md` has no Answer (the only question without a
+  default; the table asks Q1 to Q7 and Q12). Spec: Q1 answered, no spec file. Tickets: a spec file, no Tickets. Build:
+  Tickets exist and some are not done, shown as `(done/total tickets)`. Verify: every Ticket is done.
 - Left out, because the Factory has no data: design (no UI answer is parsed), the spec's required sections and the
   `egm-review-loop` result, CI and PR state, review PASS, deploy (`make smoke`) and retro. A finished Project stays at
   `verify` until the Owner moves on. Reason: YAGNI; the Owner asked for the stage line, not new detectors.
@@ -225,22 +227,21 @@ fails, the Run stops, as it does mid-Run.
   `.factory/interventions.md`. Reason: an honest count beats a guessed one.
 - `evals/new_run.sh` gives each run a local bare `origin` and a `gh` stand-in, so the Run publishes without GitHub.
 
-
 - The PR is a standard (not draft) PR since 2026-11-14, see the entry below; it still never merges.
 
 ## 2026-11-12 Sandbox probe: `srt` works for `claude -p` and git; Docker needs the host socket; `sbx` not yet probed
 
 Reason: measured result (`experiments/probe_sandbox.sh`, Issue #26). Under `srt` 0.0.82, `claude -p` (about 10 s) and
-`git commit` work once `api.anthropic.com` is allowed and `~/.claude` is writable; writes elsewhere are refused. `docker
-info` fails until the Docker unix socket is in `network.allowUnixSockets`, and that socket gives the host's Docker, so
-`srt` is no sandbox for Tickets that run containers. `sbx` needs an install and two browser logins by the Owner. Open
-for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` becomes the default.
+`git commit` work once `api.anthropic.com` is allowed and `~/.claude` is writable; writes elsewhere are refused.
+`docker info` fails until the Docker unix socket is in `network.allowUnixSockets`, and that socket gives the host's
+Docker, so `srt` is no sandbox for Tickets that run containers. `sbx` needs an install and two browser logins by the
+Owner. Open for the Owner: the `sbx` network policy (Balanced or Locked) and whether `sbx` becomes the default.
 
 ## 2026-11-14 The Factory opens standard pull requests, not drafts
 
-Reason: owner's requirement. Drafts hid the PRs from review tooling and needed a manual `gh pr ready` per PR. The Factory
-still never merges and the Session is still denied `gh` and `git push`, so the safety rule of the 2026-10-30 entry
-holds. There is no `draft` setting (YAGNI).
+Reason: owner's requirement. Drafts hid the PRs from review tooling and needed a manual `gh pr ready` per PR. The
+Factory still never merges and the Session is still denied `gh` and `git push`, so the safety rule of the 2026-10-30
+entry holds. There is no `draft` setting (YAGNI).
 
 ## 2026-11-15 The reviewer prompt asks for proof, a deletion test and a re-check
 
@@ -256,8 +257,8 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
 - With `green`, after review PASS and `gh pr create`, the Factory runs `gh pr merge --auto --merge` on the new PR, so
   GitHub merges it once its required checks are green. (Since 2026-11-14 PRs are not drafts, so no `gh pr ready` step.)
   Auto-merge needs required status checks on the base branch, else GitHub merges at once.
-- Only a PR whose base is `base_branch` is merged. A PR stacked on another factory branch is left open: merged, it
-  would land in that branch, not in `base_branch`. Later PRs of the stack are not retargeted after the bottom one merges.
+- Only a PR whose base is `base_branch` is merged. A PR stacked on another factory branch is left open: merged, it would
+  land in that branch, not in `base_branch`. Later PRs of the stack are not retargeted after the bottom one merges.
 - If `gh pr merge` fails (auto-merge disabled in the repo, missing token scope), the Run prints a warning and goes on:
   the PR is already open, so nothing is lost and the publish is not retried.
 
@@ -266,8 +267,8 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
 - At the end of a Run each `[low]` item of the Handoffs in `LOOSE-ENDS.md` becomes one `- [ ] <item> (from NN slug)`
   line in `.factory/BACKLOG.md`. A plain file write, no Session: docs/factory-analysis.md P3 planned a $0.50 Session,
   but the Ticket allows a file write and the items need no rewording. Reason: YAGNI, and no cost.
-- Not tickets in the tracker: `tickets.py` has no `new` command, and a `todo` Ticket with no blockers would be picked
-  up by the next unattended Run. The Owner promotes or drops them after reading `factory status`.
+- Not tickets in the tracker: `tickets.py` has no `new` command, and a `todo` Ticket with no blockers would be picked up
+  by the next unattended Run. The Owner promotes or drops them after reading `factory status`.
 - Only what this Run appended to `LOOSE-ENDS.md` is filed, and a line already in the file is not written again: a line
   the Owner deletes stays deleted. Items in a resolver's decision are skipped: they are not Handoff items.
 
@@ -275,7 +276,21 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
 
 - `commit()` runs `git add -f -- <paths>` and `git commit -- <paths>`. The paths are the exact files the Factory just
   wrote (`CLAUDE.md`, `.claude/settings.json`, `docs/OWNER-ANSWERS.md`, `.factory/config.toml`, `.gitignore`); no
-  directory, glob or `-A`, so `-f` can add nothing else. Both calls take the same pathspec, so other staged files stay out.
+  directory, glob or `-A`, so `-f` can add nothing else. Both calls take the same pathspec, so other staged files stay
+  out.
 - Kept, because the Owner's global gitignore has `.claude/` and without `-f` the shared `.claude/settings.json` would
   never be committed. The one file a Project ignores on purpose and the Factory still writes is `.claude/settings.json`.
 - `tests/test_commit.py` pins it: under an ignore rule only the named file is committed. Closes #25.
+
+## 2026-11-17 Deploy stage: an Environment approval gates prd, not a `stable` branch
+
+- The Owner's goal stays: no prd deploy without a human approval, an automatic deploy after it. The proposed `stable`
+  branch and "Deploy to PRD" pull request are dropped. Reasons: the Owner cannot approve a pull request the Factory
+  opened with the Owner's login (GitHub forbids self-approval), a merge gives prd a SHA CI never tested, and a second
+  long-lived branch needs hotfix back-merges. Source: best practice (build once, promote) and GitHub's rules.
+- One workflow per push to `main`: `dev`, `make smoke`, then the `prd` job behind Environment `prd` with the Owner as
+  reviewer. `dev` deploys without a click once the Owner has set it up (the one go-ahead). See `docs/adr/0001` to `0003`
+  and the full question list in `docs/deploy-stage-grill.md`.
+- The Factory only writes the workflow template and reports state; it never deploys, approves or merges for a deploy.
+  Sessions are denied `make deploy` and cloud CLIs. Source: Owner's requirement (go-ahead for anything that costs
+  money).

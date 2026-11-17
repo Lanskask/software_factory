@@ -33,3 +33,21 @@ hit.
 
 **Handoff**: The note a Session leaves for the next one: loose ends, open questions, skipped work. _Avoid_: progress
 file
+
+## Deploy
+
+**Environment**: A place a Project runs, `dev` or `prd`, each with its own credentials. _Avoid_: stage (a stage is a
+step of the Factory's pipeline), staging
+
+**Promotion**: Moving one build that already passed `dev` on to `prd`, unchanged. _Avoid_: release, deploy PR, merge to
+stable
+
+**Deploy Approval**: The Owner's click that lets a waiting Promotion reach `prd`; the only human step of a deploy.
+_Avoid_: deploy PR approval, sign-off
+
+**Smoke check**: The short check against a live Environment right after a deploy, the Project's `make smoke`. _Avoid_:
+health check, e2e
+
+**Deploy PR**: Rejected: a pull request into a `stable` branch as the prd gate. Use Deploy Approval. _Avoid_ the term.
+
+**Stable branch**: Rejected: a long-lived branch whose head is what runs on `prd`. Use Promotion. _Avoid_ the term.
