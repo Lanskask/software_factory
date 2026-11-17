@@ -119,3 +119,20 @@ def test_services_and_env_defaults_and_validation(tmp_path: Path) -> None:
     write(tmp_path, 'tickets_dir = "t"\nchecks = ["x"]\n[env]\nA = 1\n')
     with pytest.raises(ConfigError, match="env"):
         load_config(tmp_path)
+
+
+def test_template_comments_out_services_and_emulator_env_when_compose_exists(tmp_path: Path) -> None:
+    assert "FIRESTORE_EMULATOR_HOST" not in template(tmp_path)
+    (tmp_path / "compose.yml").write_text("services: {}\n")
+    text = template(tmp_path)
+    for var in ("FIREBASE_AUTH_EMULATOR_HOST", "FIRESTORE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST", "DATABASE_URL"):
+        assert f"# {var} =" in text
+    write(tmp_path, text)
+    assert load_config(tmp_path).services == ""  # all comments: the Owner opts in
+
+
+def test_template_suggests_act_as_a_comment_when_workflows_exist(tmp_path: Path) -> None:
+    assert "act -j" not in template(tmp_path)
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    line = next(ln for ln in template(tmp_path).splitlines() if "act -j" in ln)
+    assert line.startswith("# ")
