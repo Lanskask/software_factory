@@ -69,7 +69,7 @@ def planning_rules(cfg: Config, spec: Path | None, steps: tuple[str, ...]) -> st
     return f"""You are the Planning session of the Software Factory for this Project. The Owner is here and answers
 your questions. {source}
 
-Walk through these skills in order. Invoke each one yourself with the Skill tool once the previous one is finished,
+Walk through these steps in order. Invoke each skill yourself with the Skill tool once the previous one is finished,
 and tell the Owner which step you are on:
 
 0. Owner answers. Read `docs/OWNER-ANSWERS.md` (if it is missing, copy the questions from {INTERVIEW}). Ask the

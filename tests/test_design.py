@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from factory.bootstrap import TEMPLATES, missing_design, next_step
+from factory.bootstrap import missing_design, next_step
 from factory.config import Config, ConfigError, load_config
 from factory.tracker import Ticket, Tracker
 
@@ -55,7 +55,7 @@ def test_design_is_off_by_default_and_must_be_a_bool(tmp_path: Path) -> None:
         load_config(tmp_path)
 
 
-def test_the_design_checklist_has_the_generic_rules() -> None:
-    text = (TEMPLATES / "design-checklist.md").read_text().lower()
-    for rule in ("16 px", "hotkey", "phone", "label", "penpot", "design:"):
-        assert rule in text
+def test_done_tickets_and_non_ticket_files_are_not_asked_for_a_design_line(tmp_path: Path) -> None:
+    cfg = tickets(tmp_path, {"01-page.md": "# 01: Home page\n", "README.md": "Every page needs a button.\n"})
+    assert missing_design(tmp_path, cfg) == ["01-page.md"]
+    assert missing_design(tmp_path, cfg, frozenset({"page"})) == []
