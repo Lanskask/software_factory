@@ -282,18 +282,27 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
   never be committed. The one file a Project ignores on purpose and the Factory still writes is `.claude/settings.json`.
 - `tests/test_commit.py` pins it: under an ignore rule only the named file is committed. Closes #25.
 
-## 2026-11-17 Deploy stage: an Environment approval gates prd, not a `stable` branch
+## 2026-11-17 Deploy stage: an Environment approval gates prd, not a `stable` branch (proposed, pending the Owner)
 
 - The Owner's goal stays: no prd deploy without a human approval, an automatic deploy after it. The proposed `stable`
   branch and "Deploy to PRD" pull request are dropped. Reasons: the Owner cannot approve a pull request the Factory
-  opened with the Owner's login (GitHub forbids self-approval), a merge gives prd a SHA CI never tested, and a second
-  long-lived branch needs hotfix back-merges. Source: best practice (build once, promote) and GitHub's rules.
+  opened with the Owner's login (GitHub forbids self-approval), a squash merge gives prd a SHA CI never tested (a merge commit
+  keeps the tree), and a second long-lived branch needs hotfix back-merges. Source: best practice (build once, promote) and GitHub's rules.
 - One workflow per push to `main`: `dev`, `make smoke`, then the `prd` job behind Environment `prd` with the Owner as
   reviewer. `dev` deploys without a click once the Owner has set it up (the one go-ahead). See `docs/adr/0001` to `0003`
   and the full question list in `docs/deploy-stage-grill.md`.
 - The Factory only writes the workflow template and reports state; it never deploys, approves or merges for a deploy.
-  Sessions are denied `make deploy` and cloud CLIs. Source: Owner's requirement (go-ahead for anything that costs
-  money).
+  Sessions will be denied `make deploy` and cloud CLIs (issue #70, not built yet). Source: the Owner's go-ahead rule
+  for anything that costs money; the design itself was reasoned by an Opus agent playing the Owner and awaits the Owner's
+  confirmation, notably the standing `dev` go-ahead of ADR 0003.
+
+## `services` and `[env]` start local stand-ins around a Run (2026-11-17)
+
+- `services` (shell command, default none) runs once before the first Ticket of a real Run; a `--dry-run` starts
+  nothing. If it fails, no Session starts, so no money is spent. `services_down` (default `docker compose down`) runs at
+  the end of every Run that started `services`, including a failed start and an early stop.
+- `[env]` is a table of strings added to the environment of every Session and every check. Per plan step 3 of
+  `docs/plan-local-stack-and-sandbox.md`; the stand-ins cannot emulate IAM, so the real dev deploy stays. Closes #28.
 
 ## The design stage is a Planning step switched on by `design = true` (2026-11-17)
 

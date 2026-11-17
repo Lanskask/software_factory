@@ -8,10 +8,12 @@ Owner's `gcloud` and `fly` credentials live, so a Session's `make deploy` would 
 
 ## Decision
 
-The Factory writes the workflow template once and reports deploy state. It never triggers a workflow, approves a pending
-deployment, merges or pushes to anything but its own Ticket branches, pushes tags, writes secrets or runs a deploy or
-cloud command. Sessions are denied `make deploy`, `gcloud`, `terraform apply`, `terraform destroy`, `fly` and `modal`. A
-test pins the full list of `gh` calls a Run makes. A separate GitHub identity for the Factory is left out.
+The Factory writes the workflow template once and reports deploy state. "Never" covers `prd`: with `merge = "green"` the
+Factory's merges to `main` already start `dev` deploys unattended (ADR 0003). It never triggers a workflow, approves a
+pending deployment, merges or pushes to anything but its own Ticket branches, pushes tags, writes secrets or runs a
+deploy or cloud command. Sessions will be denied (issue #70, not built yet) `make deploy`, `gcloud`, `terraform apply`,
+`terraform destroy`, `fly` and `modal`. A test pins the full list of `gh` calls a Run makes. A separate GitHub identity
+for the Factory is left out.
 
 ## Consequences
 

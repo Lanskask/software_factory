@@ -1,5 +1,7 @@
 # `dev` deploys on every push to `main` without a click
 
+Status: proposed. It is a standing go-ahead for `dev` spending, so the Owner must confirm it.
+
 ## Context
 
 The Owner's rule says anything that creates cloud resources or costs money needs the Owner's go-ahead. A `dev` deploy on

@@ -42,6 +42,7 @@ import json, os, re, subprocess, sys
 prompt = sys.argv[sys.argv.index("-p") + 1]
 log = os.environ["FAKE_LOG"]
 with open(log, "a") as f: f.write(json.dumps(sys.argv[1:]) + "\n")
+with open(log + ".env", "a") as f: f.write(os.environ.get("EMU_HOST", "-") + "\n")
 def result(text, subtype="success"):
     print(json.dumps({"type": "result", "subtype": subtype, "result": text, "total_cost_usd": 0.5}))
     sys.exit(0)
@@ -486,3 +487,66 @@ def test_failed_auto_merge_warns_and_keeps_the_pr(
     assert factory(project, merge="green").run() == 0
     assert "gh pr merge failed, not auto-merged: auto-merge is not allowed" in capsys.readouterr().out
     assert not list((project / ".factory" / "unpublished").glob("*.json"))  # published, not retried
+
+
+def services_factory(p: Path, order: Path, **kw: Any) -> Factory:
+    cfg = Config(
+        tickets_dir="t",
+        checks=(f'echo "check $EMU_HOST" >> {order}',),
+        implement_skills=(),
+        review_skills=(),
+        services=f"echo up >> {order}",
+        services_down=f"echo down >> {order}",
+        env={"EMU_HOST": "localhost:9099"},
+        **kw,
+    )
+    return Factory(p, cfg, python=sys.executable)
+
+
+def test_services_come_up_before_the_first_session_and_go_down_after_the_last(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    order = project.parent / "order.log"
+    assert services_factory(project, order).run() == 0
+    lines = order.read_text().split()
+    assert lines[0] == "up" and lines[-1] == "down" and lines.count("up") == lines.count("down") == 1
+    assert "check" in lines
+
+
+def test_env_reaches_sessions_and_checks(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    order = project.parent / "order.log"
+    services_factory(project, order).run()
+    assert "check localhost:9099" in order.read_text()
+    envs = (project.parent / "claude.log.env").read_text().split()
+    assert envs and set(envs) == {"localhost:9099"}
+
+
+def test_failing_services_stop_the_run_before_any_session_and_still_tear_down(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    order = project.parent / "order.log"
+    f = services_factory(project, order)
+    object.__setattr__(f.cfg, "services", f"echo up >> {order}; exit 3")
+    assert f.run() == 1
+    assert claude_calls(project) == []
+    assert order.read_text().split() == ["up", "down"]
+
+
+def test_dry_run_does_not_start_services(project: Path) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    order = project.parent / "order.log"
+    assert services_factory(project, order).run(dry_run=True) == 0
+    assert not order.exists()
+
+
+def test_services_go_down_even_when_the_run_raises(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    order = project.parent / "order.log"
+    f = services_factory(project, order)
+
+    def boom(*a: object, **k: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(Factory, "ticket", boom)
+    with pytest.raises(RuntimeError):
+        f.run()
+    assert order.read_text().split() == ["up", "down"]
