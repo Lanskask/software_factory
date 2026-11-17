@@ -32,7 +32,17 @@ from factory.tracker import Ticket, Tracker
 # Read-only shell commands, so compound commands like `ls; cat x` are not refused (measured in the bootstrap log).
 SHELL_READ = tuple(f"Bash({c}*)" for c in ("ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "diff"))
 GIT_READ = (*SHELL_READ, "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)")
+# A Session runs on the host, where the Owner's cloud credentials live: no deploy or cloud command (ADR 0002).
+DEPLOY_NEVER = (
+    "Bash(make deploy*)",
+    "Bash(gcloud *)",
+    "Bash(terraform apply*)",
+    "Bash(terraform destroy*)",
+    "Bash(fly *)",
+    "Bash(modal *)",
+)
 NEVER = (
+    *DEPLOY_NEVER,
     "Bash(git push*)",
     "Bash(git merge*)",
     "Bash(git rebase*)",

@@ -12,7 +12,7 @@ from pathlib import Path
 from factory.bootstrap import TEMPLATES
 from factory.claude import run_session, session_command
 from factory.config import Config
-from factory.run import GIT_READ
+from factory.run import DEPLOY_NEVER, GIT_READ
 from factory.skills import INSTALLED, build_plugin, local_name
 from factory.tracker import Tracker
 
@@ -131,6 +131,7 @@ class Planner:
             disallowed=(
                 "Bash(git push*)",
                 "Bash(git commit*)",
+                *DEPLOY_NEVER,
                 *self.cfg.protected_denies(),
             ),
             budget_usd=3.0,
@@ -169,6 +170,8 @@ class Planner:
         if not (bootstrap and self.bootstrap()):
             steps = (BOOTSTRAP, *steps)
         cmd = [self.claude, "--name", f"factory {self.project.name} plan"]
+        # a variadic flag swallows the prompt that follows it: keep another flag after this list
+        cmd += ["--disallowedTools", *DEPLOY_NEVER, *self.cfg.protected_denies()]
         cmd += ["--append-system-prompt", planning_rules(self.cfg, spec, steps)]
         if self.skills:
             cmd += ["--plugin-dir", str(build_plugin(self.skills, self.state / "plan-plugin", self.installed))]
