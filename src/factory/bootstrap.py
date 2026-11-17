@@ -52,6 +52,19 @@ def answered(project: Path) -> bool:
     return f.exists() and re.search(pattern, f.read_text(), re.S | re.M) is not None
 
 
+UI_WORDS = re.compile(r"\b(UI|pages?|screens?|buttons?|hotkeys?|forms?|layout)\b", re.I)  # shortcut: keyword guess
+
+
+def missing_design(project: Path, cfg: Config) -> list[str]:
+    """Ticket files (relative to the tickets folder) that look like UI work but have no `Design:` line."""
+    root = project / cfg.tickets_dir
+    return sorted(
+        f.relative_to(root).as_posix()
+        for f in root.glob("**/*.md")
+        if (text := f.read_text()) and UI_WORDS.search(text) and not re.search(r"^Design:", text, re.M)
+    )
+
+
 def next_step(project: Path, cfg: Config) -> tuple[str, str]:
     """The Project's stage (with the Ticket count once there are Tickets) and the command that moves it on."""
     tracker = Tracker(project, cfg.tickets_dir)
@@ -61,6 +74,12 @@ def next_step(project: Path, cfg: Config) -> tuple[str, str]:
         count = f"({done}/{len(tickets)} tickets)"
         if done == len(tickets):
             return f"verify {count}", "review the PRs"  # shortcut: PR and CI state unknown; no deploy or retro
+        if cfg.design and (todo := missing_design(project, cfg)):
+            n = f"{len(todo)} UI without a Design: line"
+            return (
+                f"design ({done} of {len(tickets)} tickets, {n})",
+                f"add Design: lines, see {TEMPLATES / 'design-checklist.md'}",
+            )
         if any(t.ready for t in tickets):
             return f"build {count}", f"factory run {project} --dry-run   # then without --dry-run"
         return f"build {count}, blocked", f"factory status {project}"

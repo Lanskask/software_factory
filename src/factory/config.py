@@ -36,6 +36,7 @@ class Config:
     max_tickets: int = 10
     max_blocked: int = 2
     review_rounds: int = 2
+    design: bool = False  # add the design step to Planning and the `design` stage to `factory status`
     merge: str = "never"  # "green": turn on GitHub auto-merge for the bottom PR of the stack after review PASS
     implement_skills: tuple[str, ...] = (
         "mattpocock-skills:implement",
@@ -137,6 +138,7 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # max_tickets = 10           # per Run
 # max_blocked = 2            # Blocked Tickets that stop a Run
 # review_rounds = 2          # reviews per Ticket; each FAIL but the last gets a fix Session
+# design = false             # true: Planning adds a design step; UI Tickets then need a `Design:` line
 # merge = "never"            # "green": after review PASS, auto-merge the bottom pull request once CI is green
 # implement_skills = ["mattpocock-skills:implement", "mattpocock-skills:tdd", "mattpocock-skills:diagnosing-bugs"]
 # review_skills = ["mattpocock-skills:code-review", "agent-skills:security-and-hardening"]

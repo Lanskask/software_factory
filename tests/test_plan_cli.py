@@ -174,3 +174,15 @@ def test_run_flags_override_the_config(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr("factory.run.Factory.run", fake_run)
     assert main(["run", str(tmp_path), "--max-tickets", "3", "--budget-usd", "1.5"]) == 0
     assert (seen["cfg"].max_tickets, seen["cfg"].budget_usd) == (3, 1.5)
+
+
+def test_chain_adds_the_design_step_last_only_when_asked() -> None:
+    assert chain(spec=False)[-1] == "mattpocock-skills:to-tickets"
+    assert chain(spec=True, design=True)[-1] == "design"
+
+
+def test_planning_rules_describe_the_design_step() -> None:
+    cfg = Config(tickets_dir="t", checks=("true",), design=True)
+    r = planning_rules(cfg, None, chain(spec=False, design=True))
+    step = next(ln for ln in r.splitlines() if "design-checklist.md" in ln)
+    assert "Design:" in step and "UI" in step

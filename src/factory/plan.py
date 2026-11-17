@@ -32,12 +32,21 @@ BOOTSTRAP_TOOLS = (
 )
 
 
-def chain(*, spec: bool) -> tuple[str, ...]:
-    """The skills of Planning after the bootstrap, in order."""
+DESIGN = "design"  # a step, not a skill: follows templates/design-checklist.md
+DESIGN_CHECKLIST = TEMPLATES / "design-checklist.md"
+
+
+def chain(*, spec: bool, design: bool = False) -> tuple[str, ...]:
+    """The steps of Planning after the bootstrap, in order."""
     review_and_cut = ("egm:egm-review-loop", "mattpocock-skills:to-tickets")
-    if spec:
-        return review_and_cut
-    return ("mattpocock-skills:grill-with-docs", "mattpocock-skills:to-spec", *review_and_cut)
+    steps = (
+        review_and_cut if spec else ("mattpocock-skills:grill-with-docs", "mattpocock-skills:to-spec", *review_and_cut)
+    )
+    return (*steps, DESIGN) if design else steps
+
+
+def step_name(step: str) -> str:
+    return step if step == DESIGN else local_name(step)
 
 
 PLANNING_SKILLS = (BOOTSTRAP, *chain(spec=False))
@@ -45,8 +54,17 @@ INTERVIEW = TEMPLATES / "interview.md"
 SPEC_SECTIONS = TEMPLATES / "spec-sections.md"
 
 
+def _describe(step: str) -> str:
+    if step != DESIGN:
+        return local_name(step)
+    return (
+        f"design (a step, not a skill): for every Ticket with a UI, follow {DESIGN_CHECKLIST}, get the Owner's pick "
+        "and add a `Design:` line naming the approved board to the Ticket. Done when every UI Ticket has one."
+    )
+
+
 def planning_rules(cfg: Config, spec: Path | None, steps: tuple[str, ...]) -> str:
-    numbered = "\n".join(f"{i}. {local_name(s)}" for i, s in enumerate(steps, 1))
+    numbered = "\n".join(f"{i}. {_describe(s)}" for i, s in enumerate(steps, 1))
     source = f"The Spec is {spec}." if spec else "There is no Spec yet: the chain below writes one."
     return f"""You are the Planning session of the Software Factory for this Project. The Owner is here and answers
 your questions. {source}
@@ -144,7 +162,7 @@ class Planner:
         if self.tracker.exists():
             self.say(f"Tickets already exist in {self.cfg.tickets_dir}: run `factory run {self.project}`")
             return 0
-        steps = chain(spec=spec is not None)
+        steps = chain(spec=spec is not None, design=self.cfg.design)
         if not (bootstrap and self.bootstrap()):
             steps = (BOOTSTRAP, *steps)
         cmd = [self.claude, "--name", f"factory {self.project.name} plan"]
@@ -153,7 +171,7 @@ class Planner:
             cmd += ["--plugin-dir", str(build_plugin(self.skills, self.state / "plan-plugin", self.installed))]
         if self.cfg.model:
             cmd += ["--model", self.cfg.model]
-        self.say("opening the Planning session. Steps: " + " → ".join(f"/{local_name(s)}" for s in steps))
+        self.say("opening the Planning session. Steps: " + " → ".join(f"/{step_name(s)}" for s in steps))
         self.say("if a step does not start by itself, type its command")
         subprocess.run([*cmd, "Start Planning."], cwd=self.project)
         if self.tracker.exists():
