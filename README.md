@@ -1,10 +1,9 @@
 # Software Factory
 
 Point it at a git Project. You plan with Claude once (Spec and Tickets); then the Factory implements every Ticket
-unattended, one fresh Claude Code session each, and opens a stacked pull request per Ticket. It never merges,
-unless `merge = "green"` in `.factory/config.toml` turns on GitHub auto-merge for the bottom pull request of the stack.
-Terms are defined in [GLOSSARY.md](GLOSSARY.md), decisions and their reasons in
-[docs/DECISION-LOG.md](docs/DECISION-LOG.md).
+unattended, one fresh Claude Code session each, and opens a stacked pull request per Ticket. It never merges, unless
+`merge = "green"` in `.factory/config.toml` turns on GitHub auto-merge for the bottom pull request of the stack. Terms
+are defined in [GLOSSARY.md](GLOSSARY.md), decisions and their reasons in [docs/DECISION-LOG.md](docs/DECISION-LOG.md).
 
 ## Install
 
@@ -43,6 +42,11 @@ unanswered ones once).
 With `design = true` in `.factory/config.toml`, Planning ends with a design step that follows
 `src/factory/templates/design-checklist.md` and gives every UI Ticket a `Design:` line; `factory status` shows stage
 `design` until they all have one.
+
+With `services` and `[env]` set, a Run starts the local stand-ins (for example `docker compose up -d --wait`) once,
+gives every Session and check the `[env]` variables, and stops them at the end. `factory init` writes the emulator
+variables as comments when the Project has a `compose.yaml`. The same `make smoke` must pass against `compose` before
+the dev deploy; the real deploy then only finds what a stand-in cannot (IAM, billing, quotas).
 
 ## What a Run does per Ticket
 

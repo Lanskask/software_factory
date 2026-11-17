@@ -286,14 +286,15 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
 
 - The Owner's goal stays: no prd deploy without a human approval, an automatic deploy after it. The proposed `stable`
   branch and "Deploy to PRD" pull request are dropped. Reasons: the Owner cannot approve a pull request the Factory
-  opened with the Owner's login (GitHub forbids self-approval), a squash merge gives prd a SHA CI never tested (a merge commit
-  keeps the tree), and a second long-lived branch needs hotfix back-merges. Source: best practice (build once, promote) and GitHub's rules.
+  opened with the Owner's login (GitHub forbids self-approval), a squash merge gives prd a SHA CI never tested (a merge
+  commit keeps the tree), and a second long-lived branch needs hotfix back-merges. Source: best practice (build once,
+  promote) and GitHub's rules.
 - One workflow per push to `main`: `dev`, `make smoke`, then the `prd` job behind Environment `prd` with the Owner as
   reviewer. `dev` deploys without a click once the Owner has set it up (the one go-ahead). See `docs/adr/0001` to `0003`
   and the full question list in `docs/deploy-stage-grill.md`.
 - The Factory only writes the workflow template and reports state; it never deploys, approves or merges for a deploy.
-  Sessions will be denied `make deploy` and cloud CLIs (issue #70, not built yet). Source: the Owner's go-ahead rule
-  for anything that costs money; the design itself was reasoned by an Opus agent playing the Owner and awaits the Owner's
+  Sessions will be denied `make deploy` and cloud CLIs (issue #70, not built yet). Source: the Owner's go-ahead rule for
+  anything that costs money; the design itself was reasoned by an Opus agent playing the Owner and awaits the Owner's
   confirmation, notably the standing `dev` go-ahead of ADR 0003.
 
 ## `services` and `[env]` start local stand-ins around a Run (2026-11-17)
@@ -307,10 +308,17 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
 ## The design stage is a Planning step switched on by `design = true` (2026-11-17)
 
 - `chain(design=True)` appends a `design` step after `/to-tickets`. It is not a skill: the Planning rules tell the
-  session to follow `templates/design-checklist.md` and add a `Design: <approved board>` line to every UI Ticket.
-  The step runs last because it edits Tickets, which exist only after `/to-tickets`.
+  session to follow `templates/design-checklist.md` and add a `Design: <approved board>` line to every UI Ticket. The
+  step runs last because it edits Tickets, which exist only after `/to-tickets`.
 - It is a config key, not read from interview Q7, so the Factory never parses free-text answers (the Owner's
   requirement: P6 in `docs/factory-analysis.md`, from three handoffs that asked for design-page deviations).
-- Exit check: `factory status` shows stage `design (N UI without a Design: line)` until each UI Ticket has the line.
-  A Ticket counts as UI when its text has a word like page, screen, button, hotkey or form: a keyword guess, which
-  can show a false stage (fix: add the `Design:` line, even `Design: none, no visual change`). Closes #16.
+- Exit check: `factory status` shows stage `design (N UI without a Design: line)` until each UI Ticket has the line. A
+  Ticket counts as UI when its text has a word like page, screen, button, hotkey or form: a keyword guess, which can
+  show a false stage (fix: add the `Design:` line, even `Design: none, no visual change`). Closes #16.
+
+## Stand-ins are detected, not enabled (2026-11-17)
+
+- `factory init` writes the `services` and `[env]` emulator variables as comments when `compose.yaml` exists, and an
+  `act` hint when `.github/workflows/` exists. Nothing is switched on: starting Docker is the Owner's choice.
+- The Spec gets a "Local stand-ins" section; the planning rules make the first Ticket `compose.yaml` plus `make dev`,
+  and `make smoke` must pass against `compose` before the dev deploy. Closes #29, #30, #31.

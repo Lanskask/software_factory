@@ -108,6 +108,20 @@ def _check_type(path: Path, name: str, value: object, default: object) -> object
     return value
 
 
+ENV_GENERIC = """
+# [env]  # keep this table last: it is set for every Session and check
+# KEY = "value"
+"""
+ENV_COMPOSE = """
+# [env]  # keep this table last: local stand-ins every Session and check can reach
+# FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099"
+# FIRESTORE_EMULATOR_HOST = "localhost:8080"
+# STORAGE_EMULATOR_HOST = "http://localhost:4443"
+# PUBSUB_EMULATOR_HOST = "localhost:8085"
+# DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
+"""
+
+
 def template(project: Path) -> str:
     """A starting config.toml: checks from the Makefile targets that exist, tickets where /to-tickets puts them."""
     makefile = project / "Makefile"
@@ -128,6 +142,13 @@ def template(project: Path) -> str:
     tickets_dir = found[0].parent.relative_to(project).as_posix() if found else f".scratch/{project.name}/tickets"
     bun = (project / "web" / "package.json").exists()
     allowed = 'allowed_tools = ["Bash(bun *)"]' if bun else '# allowed_tools = ["Bash(bun run test*)"]'
+    compose = any((project / n).exists() for n in ("compose.yaml", "compose.yml", "docker-compose.yml"))
+    act = (
+        '\n# add "act -j <job>" to checks to run the CI workflow locally'
+        if (project / ".github" / "workflows").exists()
+        else ""
+    )
+    env = ENV_COMPOSE if compose else ENV_GENERIC
     return f'''# Software Factory settings for this Project. Every key but the first two is optional.
 tickets_dir = "{tickets_dir}"  # where /to-tickets writes tickets.py and NN-*.md
 checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
@@ -147,9 +168,8 @@ checks = [{quoted}]  # must all exit 0 before a Ticket is pushed
 # review_rounds = 2          # reviews per Ticket; each FAIL but the last gets a fix Session
 # services = "docker compose up -d --wait"  # local stand-ins, started once before the first Ticket
 # services_down = "docker compose down"      # set it with `services` when that is not compose; runs after the Run
-# [env]                      # set for every Session and check, e.g. FIRESTORE_EMULATOR_HOST = "localhost:8080"
 # design = false             # true: Planning adds a design step; UI Tickets then need a `Design:` line
 # merge = "never"            # "green": after review PASS, auto-merge the bottom pull request once CI is green
 # implement_skills = ["mattpocock-skills:implement", "mattpocock-skills:tdd", "mattpocock-skills:diagnosing-bugs"]
-# review_skills = ["mattpocock-skills:code-review", "agent-skills:security-and-hardening"]
-'''
+# review_skills = ["mattpocock-skills:code-review", "agent-skills:security-and-hardening"]{act}
+{env}'''

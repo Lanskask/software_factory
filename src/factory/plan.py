@@ -80,6 +80,8 @@ and tell the Owner which step you are on:
 
 Rules for the result
 - /to-spec includes the sections of {SPEC_SECTIONS} in the Spec: Alternatives, Risks and Deploy preflight.
+- when the Spec has Local stand-ins, the first Ticket of the Project is `compose.yaml` and `make dev` with every
+  stand-in up, and `make smoke` passes against `compose` before the dev deploy.
 - every deploy Ticket's acceptance criteria end in `make smoke` passing against the live URL, and a deploy Ticket
   says "Owner's go-ahead".
 - The issue tracker is local files. /to-tickets writes the Tickets with its tickets.py into `{cfg.tickets_dir}`

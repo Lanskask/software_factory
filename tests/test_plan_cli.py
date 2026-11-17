@@ -186,3 +186,15 @@ def test_planning_rules_describe_the_design_step() -> None:
     r = planning_rules(cfg, None, chain(spec=False, design=True))
     step = next(ln for ln in r.splitlines() if "design-checklist.md" in ln)
     assert "Design:" in step and "UI" in step
+
+
+def test_spec_sections_have_local_stand_ins_and_smoke_against_compose() -> None:
+    text = SPEC_SECTIONS.read_text()
+    assert "## Local stand-ins" in text and "none: owner checks by hand" in text
+    assert "`make smoke` passes against `compose` before the dev deploy" in text
+
+
+def test_planning_rules_make_the_first_ticket_compose_and_make_dev_when_there_are_services() -> None:
+    r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
+    bullet = next(b for b in r.split("\n- ") if "stand-ins" in b)
+    assert "`compose.yaml`" in bullet and "`make dev`" in bullet and "first Ticket" in bullet

@@ -1,6 +1,6 @@
 # Spec sections
 
-Every Spec has these three sections, after its user stories. Write "None." under a section that has nothing, and say
+Every Spec has these four sections, after its user stories. Write "None." under a section that has nothing, and say
 why.
 
 ## Alternatives
@@ -12,6 +12,14 @@ lost.
 
 What could go wrong (cost, data loss, security, an unproven library, a limit of the platform), how likely it is, and
 what the Spec does about it.
+
+## Local stand-ins
+
+For each external service the Project uses (database, auth, storage, queue, mail, payments, other HTTP APIs), the local
+stand-in that replaces it while the Factory builds and tests: for example a `postgres` container, the Firebase
+emulators, `fake-gcs-server`, Mailpit, `stripe-mock`. Write "none: owner checks by hand" for a service with no
+stand-in. A stand-in cannot emulate IAM, billing, quotas or real tokens, so the real dev deploy stays. A Project with no
+external services writes "None.".
 
 ## Deploy preflight
 
@@ -25,3 +33,4 @@ deploy writes "None.".
 - State bucket: the Terraform state bucket exists before `terraform init`.
 - Deletion protection: which resources have it on, and how a Ticket turns it off when it must replace one.
 - `make smoke`: the exact command and the live URL it checks. Every deploy Ticket's acceptance ends with it passing.
+  The same `make smoke` passes against `compose` before the dev deploy, so a deploy only finds what a stand-in cannot.
