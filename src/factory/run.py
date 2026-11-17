@@ -231,9 +231,10 @@ class Factory:
             return self._run(dry_run=dry_run)
         finally:
             if self.services_started:  # also after a failed start: `compose down` clears a half-started stack
-                subprocess.run(
-                    self.cfg.services_down, shell=True, cwd=self.project, env=self.env()
-                )  # every way out of a Run, early stops included, files the [low] loose ends
+                down = subprocess.run(self.cfg.services_down, shell=True, cwd=self.project, env=self.env())
+                if down.returncode:
+                    self.say(f"warning: `{self.cfg.services_down}` exited {down.returncode}: services may still run")
+            # every way out of a Run, early stops included, files the [low] loose ends
             if filed := self.file_backlog(logged_before):
                 self.say(f"{filed} [low] loose ends filed as Backlog tickets in .factory/BACKLOG.md")
 

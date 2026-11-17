@@ -536,3 +536,17 @@ def test_dry_run_does_not_start_services(project: Path) -> None:
     order = project.parent / "order.log"
     assert services_factory(project, order).run(dry_run=True) == 0
     assert not order.exists()
+
+
+def test_services_go_down_even_when_the_run_raises(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    with_tickets(project, {"01": {"slug": "a"}})
+    order = project.parent / "order.log"
+    f = services_factory(project, order)
+
+    def boom(*a: object, **k: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(Factory, "ticket", boom)
+    with pytest.raises(RuntimeError):
+        f.run()
+    assert order.read_text().split() == ["up", "down"]
