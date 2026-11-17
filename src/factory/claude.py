@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,10 +73,20 @@ def parse_stream(text: str) -> SessionResult:
     return SessionResult(ok=True, text=str(final.get("result") or ""), cost_usd=cost)
 
 
-def run_session(cmd: list[str], cwd: Path, log: Path, timeout_s: float) -> SessionResult:
+def run_session(
+    cmd: list[str], cwd: Path, log: Path, timeout_s: float, env: dict[str, str] | None = None
+) -> SessionResult:
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("w") as out:
-        proc = subprocess.Popen(cmd, cwd=cwd, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True)
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=out,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            env={**os.environ, **env} if env else None,
+        )
         try:
             proc.wait(timeout=timeout_s)
         except subprocess.TimeoutExpired:

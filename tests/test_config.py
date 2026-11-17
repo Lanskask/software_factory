@@ -108,3 +108,14 @@ def test_template_copies_the_make_targets_ci_runs_into_checks(tmp_path: Path) ->
     write(tmp_path, template(tmp_path))
     # setup installs and deploy ships: neither is a check; "make sure" in a comment is not a target
     assert load_config(tmp_path).checks == ("make typecheck", "make lint", "make test")
+
+
+def test_services_and_env_defaults_and_validation(tmp_path: Path) -> None:
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["make test"]\n')
+    cfg = load_config(tmp_path)
+    assert cfg.services == "" and cfg.env == {} and cfg.services_down == "docker compose down"
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["x"]\nservices = "docker compose up -d --wait"\n[env]\nA = "1"\n')
+    assert load_config(tmp_path).env == {"A": "1"}
+    write(tmp_path, 'tickets_dir = "t"\nchecks = ["x"]\n[env]\nA = 1\n')
+    with pytest.raises(ConfigError, match="env"):
+        load_config(tmp_path)

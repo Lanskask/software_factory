@@ -279,3 +279,11 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
 - Kept, because the Owner's global gitignore has `.claude/` and without `-f` the shared `.claude/settings.json` would
   never be committed. The one file a Project ignores on purpose and the Factory still writes is `.claude/settings.json`.
 - `tests/test_commit.py` pins it: under an ignore rule only the named file is committed. Closes #25.
+
+## `services` and `[env]` start local stand-ins around a Run (2026-11-17)
+
+- `services` (shell command, default none) runs once before the first Ticket of a real Run; a `--dry-run` starts
+  nothing. If it fails, no Session starts, so no money is spent. `services_down` (default `docker compose down`) runs at
+  the end of every Run that started `services`, including a failed start and an early stop.
+- `[env]` is a table of strings added to the environment of every Session and every check. Per plan step 3 of
+  `docs/plan-local-stack-and-sandbox.md`; the stand-ins cannot emulate IAM, so the real dev deploy stays. Closes #28.

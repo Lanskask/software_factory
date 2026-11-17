@@ -4,6 +4,7 @@ before the Factory pushes it and opens a pull request. Nothing is ever merged.""
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -74,6 +75,7 @@ class Factory:
         self.installed = installed
         self.plugin_dir: str | None = None
         self.cost = 0.0
+        self.services_started = False
         self.rate_limit_wait_s = 15 * 60  # between tries of a rate-limited Session
         self.rate_limit_max_s = 6 * 3600  # the subscription limit resets within 5 hours
 
@@ -132,7 +134,7 @@ class Factory:
             self.say(f"{ticket.num}: {kind} session {n}, log {log.relative_to(self.project)}")
             name = f"factory {self.project.name} {ticket.num} {kind} {n}"
             cmd = self.command(prompt, review=review, name=name, resolve=resolve)
-            res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60)
+            res = run_session(cmd, self.project, log, self.cfg.timeout_minutes * 60, self.cfg.env)
             self.cost += res.cost_usd
             self.say(f"{ticket.num}: {kind} session {n} ended, ${res.cost_usd:.2f}, ok={res.ok}")
             if not res.rate_limited or waited >= self.rate_limit_max_s:
@@ -219,11 +221,19 @@ class Factory:
         self.ensure_plugin()  # the resolver gets the same skills as it would at the end of a Run
         return (handoff, resolved) if (resolved := self.resolve(tip, handoff)) else None
 
+    def env(self) -> dict[str, str]:
+        return {**os.environ, **self.cfg.env}
+
     def run(self, *, dry_run: bool = False) -> int:
         logged_before = self.loose_ends_size()
+        self.services_started = False
         try:
             return self._run(dry_run=dry_run)
-        finally:  # every way out of a Run, early stops included, files the [low] loose ends
+        finally:
+            if self.services_started:  # also after a failed start: `compose down` clears a half-started stack
+                subprocess.run(
+                    self.cfg.services_down, shell=True, cwd=self.project, env=self.env()
+                )  # every way out of a Run, early stops included, files the [low] loose ends
             if filed := self.file_backlog(logged_before):
                 self.say(f"{filed} [low] loose ends filed as Backlog tickets in .factory/BACKLOG.md")
 
@@ -239,6 +249,17 @@ class Factory:
             return 1
         if not dry_run:  # lessons are per Run: a stale one would warn about a mistake the Owner already fixed
             self.reset_lessons()
+        if self.cfg.services and not dry_run:
+            self.say(f"starting local services: {self.cfg.services}")
+            self.services_started = True
+            up = subprocess.run(
+                self.cfg.services, shell=True, cwd=self.project, env=self.env(), capture_output=True, text=True
+            )
+            if up.returncode != 0:
+                self.say(
+                    f"services failed (exit {up.returncode}), no Session started:\n{(up.stdout + up.stderr)[-500:]}"
+                )
+                return 1
         base = self.stack_tip()
         if base != self.git("rev-parse", "--abbrev-ref", "HEAD"):
             self.say(f"switching to {base}, the tip of the stack")
@@ -437,7 +458,9 @@ class Factory:
         if not handoff.exists():
             return f"no Handoff at {handoff}"
         for check in self.cfg.checks:
-            r = subprocess.run(["/bin/sh", "-c", check], cwd=self.project, capture_output=True, text=True)
+            r = subprocess.run(
+                ["/bin/sh", "-c", check], cwd=self.project, capture_output=True, text=True, env=self.env()
+            )
             if r.returncode != 0:
                 tail = "\n".join((r.stdout + r.stderr).splitlines()[-20:])
                 return f"check `{check}` failed (exit {r.returncode}):\n{tail}"
