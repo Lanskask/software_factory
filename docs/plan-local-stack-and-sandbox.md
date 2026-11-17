@@ -1,6 +1,6 @@
 # Plan: local stand-ins and sandboxed Sessions
 
-Written 2026-11-12. Based on web research on that date; links are in the "Sources" section. Nothing here is built yet.
+Written 2026-11-12. Based on web research on that date; links are in the "Sources" section. The command syntax of `sbx` and `srt` is in `docs/sandbox-syntax.md`. Steps 3 to 6 are built; 1 and 2 wait for the probe.
 
 ## Answers in short
 
