@@ -196,5 +196,5 @@ def test_spec_sections_have_local_stand_ins_and_smoke_against_compose() -> None:
 
 def test_planning_rules_make_the_first_ticket_compose_and_make_dev_when_there_are_services() -> None:
     r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
-    bullet = next(b for b in r.split("\n- ") if "stand-ins" in b)
+    bullet = next(b for b in r.split("\n- ") if "first Ticket" in b)
     assert "`compose.yaml`" in bullet and "`make dev`" in bullet and "first Ticket" in bullet

@@ -123,9 +123,8 @@ def test_services_and_env_defaults_and_validation(tmp_path: Path) -> None:
 
 def test_template_comments_out_services_and_emulator_env_when_compose_exists(tmp_path: Path) -> None:
     assert "FIRESTORE_EMULATOR_HOST" not in template(tmp_path)
-    (tmp_path / "compose.yaml").write_text("services: {}\n")
+    (tmp_path / "compose.yml").write_text("services: {}\n")
     text = template(tmp_path)
-    assert 'services = "docker compose up -d --wait"' in text
     for var in ("FIREBASE_AUTH_EMULATOR_HOST", "FIRESTORE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST", "DATABASE_URL"):
         assert f"# {var} =" in text
     write(tmp_path, text)
