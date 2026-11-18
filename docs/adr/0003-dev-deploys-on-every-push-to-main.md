@@ -1,6 +1,6 @@
 # `dev` deploys on every push to `main` without a click
 
-Status: proposed. It is a standing go-ahead for `dev` spending, so the Owner must confirm it.
+Status: accepted by the Owner on 2026-11-17 ("i agree with your advises").
 
 ## Context
 

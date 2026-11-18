@@ -1,6 +1,6 @@
 # The prd gate is a GitHub Environment approval, not a `stable` branch
 
-Status: proposed, pending the Owner's confirmation.
+Status: accepted by the Owner on 2026-11-17 ("i agree with your advises").
 
 ## Context
 

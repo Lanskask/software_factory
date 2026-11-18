@@ -282,7 +282,7 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
   never be committed. The one file a Project ignores on purpose and the Factory still writes is `.claude/settings.json`.
 - `tests/test_commit.py` pins it: under an ignore rule only the named file is committed. Closes #25.
 
-## 2026-11-17 Deploy stage: an Environment approval gates prd, not a `stable` branch (proposed, pending the Owner)
+## 2026-11-17 Deploy stage: an Environment approval gates prd, not a `stable` branch (accepted by the Owner, 2026-11-17)
 
 - The Owner's goal stays: no prd deploy without a human approval, an automatic deploy after it. The proposed `stable`
   branch and "Deploy to PRD" pull request are dropped. Reasons: the Owner cannot approve a pull request the Factory
@@ -293,9 +293,9 @@ result, 3 diffs and 6 planted or confirmed bugs, so a signal and not proof.
   reviewer. `dev` deploys without a click once the Owner has set it up (the one go-ahead). See `docs/adr/0001` to `0003`
   and the full question list in `docs/deploy-stage-grill.md`.
 - The Factory only writes the workflow template and reports state; it never deploys, approves or merges for a deploy.
-  Sessions will be denied `make deploy` and cloud CLIs (issue #70, not built yet). Source: the Owner's go-ahead rule for
-  anything that costs money; the design itself was reasoned by an Opus agent playing the Owner and awaits the Owner's
-  confirmation, notably the standing `dev` go-ahead of ADR 0003.
+  Sessions are denied `make deploy` and cloud CLIs (`DEPLOY_NEVER`). Source: the Owner's go-ahead rule for
+  anything that costs money; the design was reasoned by an Opus agent playing the Owner, then accepted by the Owner on
+  2026-11-17, including the standing `dev` go-ahead of ADR 0003.
 
 ## `services` and `[env]` start local stand-ins around a Run (2026-11-17)
 

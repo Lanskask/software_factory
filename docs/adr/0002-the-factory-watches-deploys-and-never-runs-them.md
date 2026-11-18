@@ -1,5 +1,7 @@
 # The Factory watches deploys and never runs or approves them
 
+Status: accepted by the Owner on 2026-11-17.
+
 ## Context
 
 The Factory runs `gh` with the Owner's token, so GitHub cannot tell a Factory call from the Owner's click: any branch
@@ -11,9 +13,10 @@ Owner's `gcloud` and `fly` credentials live, so a Session's `make deploy` would 
 The Factory writes the workflow template once and reports deploy state. "Never" covers `prd`: with `merge = "green"` the
 Factory's merges to `main` already start `dev` deploys unattended (ADR 0003). It never triggers a workflow, approves a
 pending deployment, merges or pushes to anything but its own Ticket branches, pushes tags, writes secrets or runs a
-deploy or cloud command. Sessions will be denied (issue #70, not built yet) `make deploy`, `gcloud`, `terraform apply`,
-`terraform destroy`, `fly` and `modal`. A test pins the full list of `gh` calls a Run makes. A separate GitHub identity
-for the Factory is left out.
+deploy or cloud command. Sessions are denied (`DEPLOY_NEVER` in `src/factory/run.py`) `make deploy`, `gcloud`,
+`terraform apply`, `terraform destroy`, `fly`, `flyctl` and `modal`. The list is best effort (`env gcloud` or
+`uvx modal` get past a pattern); the real lock is the `prd` Environment approval. A test pins the full list of `gh`
+calls a Run makes. A separate GitHub identity for the Factory is left out.
 
 ## Consequences
 

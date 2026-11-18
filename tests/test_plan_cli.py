@@ -198,3 +198,16 @@ def test_planning_rules_make_the_first_ticket_compose_and_make_dev_when_there_ar
     r = planning_rules(Config(tickets_dir="t", checks=("true",)), None, chain(spec=False))
     bullet = next(b for b in r.split("\n- ") if "first Ticket" in b)
     assert "`compose.yaml`" in bullet and "`make dev`" in bullet and "first Ticket" in bullet
+
+
+def test_planning_session_is_denied_deploy_commands_and_keeps_its_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exe = fake_claude(tmp_path, monkeypatch)
+    proj = tmp_path / "p"
+    proj.mkdir()
+    Planner(proj, Config(tickets_dir="t", checks=("true",)), claude=str(exe), skills=()).plan(None, bootstrap=False)
+    argv = calls(tmp_path)[-1]
+    assert "Bash(gcloud*)" in argv and "Bash(make*deploy*)" in argv
+    assert argv[-1] == "Start Planning."
+    assert argv[argv.index("Bash(modal*)") + 1].startswith("--")
