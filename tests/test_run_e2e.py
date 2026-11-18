@@ -553,12 +553,13 @@ def test_services_go_down_even_when_the_run_raises(project: Path, monkeypatch: p
 
 
 DEPLOY_DENIES = (
-    "Bash(make deploy*)",
-    "Bash(gcloud *)",
-    "Bash(terraform apply*)",
-    "Bash(terraform destroy*)",
-    "Bash(fly *)",
-    "Bash(modal *)",
+    "Bash(make*deploy*)",
+    "Bash(gcloud*)",
+    "Bash(terraform*apply*)",
+    "Bash(terraform*destroy*)",
+    "Bash(fly*)",
+    "Bash(flyctl*)",
+    "Bash(modal*)",
 )
 
 
@@ -569,12 +570,15 @@ def test_every_session_is_denied_deploy_and_cloud_commands(project: Path, monkey
     sessions = claude_calls(project)
     assert len(sessions) >= 3  # implement, review, resolver
     for argv in sessions:
-        denied = argv[argv.index("--disallowedTools") + 1 :]
+        start = argv.index("--disallowedTools") + 1
+        end = next(i for i in range(start, len(argv)) if argv[i].startswith("--"))
+        denied = argv[start:end]
         assert all(d in denied for d in DEPLOY_DENIES)
 
 
 def test_a_run_makes_only_the_gh_calls_and_pushes_the_deploy_stage_allows(project: Path) -> None:
     with_tickets(project, {"01": {"slug": "a"}, "02": {"slug": "b", "blocked_by": ["01"]}})
+    main_before = git(project, "ls-remote", "origin", "refs/heads/main").split()[0]
     assert factory(project, merge="green").run() == 0
     for call in gh_calls(project):
         assert call[:2] == ["pr", "create"] or call[:4] == ["pr", "merge", "--auto", "--merge"], call
@@ -582,3 +586,4 @@ def test_a_run_makes_only_the_gh_calls_and_pushes_the_deploy_stage_allows(projec
     assert [c[-1] for c in merges] == ["factory/01-a"]  # only the PR on base_branch
     refs = git(project, "ls-remote", "origin").split()[1::2]
     assert all(r in ("HEAD", "refs/heads/main") or r.startswith("refs/heads/factory/") for r in refs), refs
+    assert git(project, "ls-remote", "origin", "refs/heads/main").split()[0] == main_before

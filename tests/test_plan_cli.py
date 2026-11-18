@@ -208,6 +208,6 @@ def test_planning_session_is_denied_deploy_commands_and_keeps_its_prompt(
     proj.mkdir()
     Planner(proj, Config(tickets_dir="t", checks=("true",)), claude=str(exe), skills=()).plan(None, bootstrap=False)
     argv = calls(tmp_path)[-1]
-    assert "Bash(gcloud *)" in argv and "Bash(make deploy*)" in argv
+    assert "Bash(gcloud*)" in argv and "Bash(make*deploy*)" in argv
     assert argv[-1] == "Start Planning."
-    assert argv[argv.index("Bash(modal *)") + 1].startswith("--")
+    assert argv[argv.index("Bash(modal*)") + 1].startswith("--")

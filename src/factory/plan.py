@@ -171,7 +171,7 @@ class Planner:
             steps = (BOOTSTRAP, *steps)
         cmd = [self.claude, "--name", f"factory {self.project.name} plan"]
         # a variadic flag swallows the prompt that follows it: keep another flag after this list
-        cmd += ["--disallowedTools", *DEPLOY_NEVER, *self.cfg.protected_denies()]
+        cmd += ["--disallowedTools", *DEPLOY_NEVER]
         cmd += ["--append-system-prompt", planning_rules(self.cfg, spec, steps)]
         if self.skills:
             cmd += ["--plugin-dir", str(build_plugin(self.skills, self.state / "plan-plugin", self.installed))]

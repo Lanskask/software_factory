@@ -14,8 +14,9 @@ The Factory writes the workflow template once and reports deploy state. "Never" 
 Factory's merges to `main` already start `dev` deploys unattended (ADR 0003). It never triggers a workflow, approves a
 pending deployment, merges or pushes to anything but its own Ticket branches, pushes tags, writes secrets or runs a
 deploy or cloud command. Sessions are denied (`DEPLOY_NEVER` in `src/factory/run.py`) `make deploy`, `gcloud`,
-`terraform apply`, `terraform destroy`, `fly` and `modal`. A test pins the full list of `gh` calls a Run makes. A
-separate GitHub identity for the Factory is left out.
+`terraform apply`, `terraform destroy`, `fly`, `flyctl` and `modal`. The list is best effort (`env gcloud` or
+`uvx modal` get past a pattern); the real lock is the `prd` Environment approval. A test pins the full list of `gh`
+calls a Run makes. A separate GitHub identity for the Factory is left out.
 
 ## Consequences
 

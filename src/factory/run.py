@@ -33,13 +33,15 @@ from factory.tracker import Ticket, Tracker
 SHELL_READ = tuple(f"Bash({c}*)" for c in ("ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "diff"))
 GIT_READ = (*SHELL_READ, "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)")
 # A Session runs on the host, where the Owner's cloud credentials live: no deploy or cloud command (ADR 0002).
+# Best effort: a pattern list cannot stop `env gcloud` or `uvx modal`; the real lock is the prd Environment approval.
 DEPLOY_NEVER = (
-    "Bash(make deploy*)",
-    "Bash(gcloud *)",
-    "Bash(terraform apply*)",
-    "Bash(terraform destroy*)",
-    "Bash(fly *)",
-    "Bash(modal *)",
+    "Bash(make*deploy*)",
+    "Bash(gcloud*)",
+    "Bash(terraform*apply*)",
+    "Bash(terraform*destroy*)",
+    "Bash(fly*)",
+    "Bash(flyctl*)",
+    "Bash(modal*)",
 )
 NEVER = (
     *DEPLOY_NEVER,
